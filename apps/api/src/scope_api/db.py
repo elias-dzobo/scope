@@ -2707,6 +2707,7 @@ def update_run_state(
     summary: dict[str, Any] | None = None,
     result: dict[str, Any] | None = None,
     completed: bool = False,
+    started_at: str | None = None,
 ) -> None:
     if database_backend() == "postgres":
         return _update_run_state_postgres(
@@ -2722,6 +2723,7 @@ def update_run_state(
             summary=summary,
             result=result,
             completed=completed,
+            started_at=started_at,
         )
 
     fields: list[str] = ["updated_at = ?"]
@@ -2787,6 +2789,7 @@ def _update_run_state_postgres(
     summary: dict[str, Any] | None = None,
     result: dict[str, Any] | None = None,
     completed: bool = False,
+    started_at: str | None = None,
 ) -> None:
     fields: list[str] = ["updated_at = %s"]
     values: list[Any] = [utc_now_iso()]
@@ -2820,6 +2823,9 @@ def _update_run_state_postgres(
     if result is not None:
         fields.append("result_json = %s")
         values.append(json.dumps(result))
+    if started_at is not None:
+        fields.append("started_at = %s")
+        values.append(started_at)
     if completed:
         fields.append("completed_at = %s")
         values.append(utc_now_iso())
