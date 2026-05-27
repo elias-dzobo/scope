@@ -1,0 +1,16 @@
+[Unit]
+Description=Scope Research Worker
+After=network.target postgresql.service docker.service
+
+[Service]
+User=scope
+Group=scope
+WorkingDirectory=/opt/scope/app
+EnvironmentFile=/etc/scope/scope.env
+ExecStart=/home/scope/.local/bin/uv run python -m scope_api.worker
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

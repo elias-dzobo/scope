@@ -1,0 +1,125 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"displayMode": "list", "placement": "right"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "expr": "sum(rate(scope_api_requests_total[5m])) by (method, route, status_code)",
+          "interval": "",
+          "legendFormat": "{{method}} {{route}} {{status_code}}",
+          "refId": "A"
+        }
+      ],
+      "title": "API Request Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 0},
+      "id": 2,
+      "options": {"legend": {"displayMode": "list", "placement": "right"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(scope_api_request_duration_seconds_bucket[5m])) by (le, method))",
+          "refId": "A",
+          "legendFormat": "{{method}} p95"
+        }
+      ],
+      "title": "API Latency P95",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 0},
+      "id": 3,
+      "targets": [
+        {
+          "expr": "sum(rate(scope_llm_calls_total[5m])) by (operation, model)",
+          "refId": "A",
+          "legendFormat": "{{operation}} {{model}}"
+        }
+      ],
+      "title": "LLM Calls / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 7},
+      "id": 4,
+      "targets": [
+        {
+          "expr": "sum(rate(scope_search_calls_total[5m])) by (provider, result)",
+          "refId": "A",
+          "legendFormat": "{{provider}} {{result}}"
+        }
+      ],
+      "title": "Search Calls by Provider",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 7},
+      "id": 5,
+      "targets": [
+        {
+          "expr": "scope_orchestrator_queue_depth",
+          "refId": "A"
+        }
+      ],
+      "title": "Orchestrator Queue Depth",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 14},
+      "id": 6,
+      "targets": [
+        {
+          "expr": "sum(rate(scope_pipeline_stage_total[5m])) by (stage, result)",
+          "refId": "A",
+          "legendFormat": "{{stage}} {{result}}"
+        }
+      ],
+      "title": "Pipeline Stage Throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "fieldConfig": {"defaults": {"unit": "none"}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 14},
+      "id": 7,
+      "targets": [
+        {
+          "expr": "sum by (result) (increase(scope_orchestrator_completion_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{result}}"
+        }
+      ],
+      "title": "Run Completions by Result (1h)",
+      "type": "piechart"
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["scope", "stock-research"],
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Scope Stock Research - Platform Observability",
+  "uid": "scope-overview",
+  "version": 1
+}

@@ -1,0 +1,15 @@
+.git
+.venv
+__pycache__
+.pytest_cache
+.mypy_cache
+.DS_Store
+storage
+artifacts
+web/artifacts
+apps/web/node_modules
+apps/web/dist
+node_modules
+*.log
+.env
+apps/web/.env

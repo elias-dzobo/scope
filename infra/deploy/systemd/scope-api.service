@@ -1,0 +1,16 @@
+[Unit]
+Description=Scope FastAPI Backend
+After=network.target postgresql.service docker.service
+
+[Service]
+User=scope
+Group=scope
+WorkingDirectory=/opt/scope/app
+EnvironmentFile=/etc/scope/scope.env
+ExecStart=/home/scope/.local/bin/uv run uvicorn scope_api.app:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

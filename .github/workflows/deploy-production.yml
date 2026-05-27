@@ -1,0 +1,25 @@
+name: Deploy Production
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy production release over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: scope
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /opt/scope/app
+            SCOPE_RELEASE_REF="${{ github.ref_name }}" ./scripts/deploy_vps.sh

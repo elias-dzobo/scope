@@ -1,0 +1,45 @@
+# Horus journey template
+#
+# 1. Set base_url to the app you want to test.
+# 2. Choose either a goal-driven journey or explicit steps.
+# 3. Run it with:
+#      npx horus run journeys/first-journey.yaml.example
+#
+# Agent mode uses OpenAI when OPENAI_API_KEY is present in your shell or .env.
+# Without OPENAI_API_KEY, only simple demo flows are supported by the fallback planner.
+
+name: first_journey
+base_url: http://localhost:3000
+
+# Goal-driven agent journey:
+# Describe the user outcome. Horus will observe the page, choose one browser
+# action at a time, and record each action in the run report.
+goal: >
+  Fill the inputs fields with a company name and ticker and 
+  click the button to initiate the research
+success_text: "Success"
+max_steps: 20
+
+inputs:
+  company: "Microsoft"
+  ticker: "MSFT"
+
+# Explicit step journey:
+# Use this style when the flow is stable, security-sensitive, or requires
+# exact selectors. Uncomment and remove the goal/success_text fields above.
+#
+# steps:
+#   - goto: /login
+#   - fill:
+#       selector: "[name=email]"
+#       value: "{{env.TEST_EMAIL}}"
+#   - fill:
+#       selector: "[name=password]"
+#       value: "{{env.TEST_PASSWORD}}"
+#   - click: "button[type=submit]"
+#   - expect_text: "Dashboard"
+#
+# Notes on OTP and magic links:
+# Horus v1 does not read email inboxes or SMS messages. For sign-in flows that
+# require a one-time code or magic link, use a test bypass, seeded session, fixed
+# test OTP, or an explicit backend/API helper before the browser journey starts.

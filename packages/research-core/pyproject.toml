@@ -1,0 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "research-core"
+version = "0.1.0"
+description = "Research pipeline — harness, scoring, synthesis, grounding"
+requires-python = ">=3.13"
+dependencies = []  # all deps managed at workspace root
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/research_core"]

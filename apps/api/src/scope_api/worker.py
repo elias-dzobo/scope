@@ -1,0 +1,133 @@
+"""Durable research worker entrypoint.
+
+The worker leases queued research runs from the database, executes one run at a
+time, renews a heartbeat while the job is active, and returns failed runs to the
+queue until their retry budget is exhausted. This is the production execution
+path for Fly.io/VPS deployments where API Machines and worker Machines run as
+separate processes.
+"""
+
+from __future__ import annotations
+
+import os
+import socket
+import threading
+import time
+from typing import Any
+
+from scope_api import db
+from scope_api.application.run_service import ResearchRunService
+from research_core.utils.logger import configure_logging, get_logger
+
+logger = get_logger(__name__)
+
+
+class DurableResearchWorker:
+    """Poll the database for research runs and execute them under a lease."""
+
+    def __init__(
+        self,
+        *,
+        worker_id: str | None = None,
+        poll_interval_seconds: float = 2.0,
+        lease_seconds: int = 300,
+        heartbeat_interval_seconds: float = 30.0,
+    ) -> None:
+        self.worker_id = worker_id or _default_worker_id()
+        self.poll_interval_seconds = max(poll_interval_seconds, 0.5)
+        self.lease_seconds = max(lease_seconds, 30)
+        self.heartbeat_interval_seconds = max(heartbeat_interval_seconds, 5.0)
+        self._service = ResearchRunService()
+        self._stop = threading.Event()
+
+    def run_forever(self) -> None:
+        """Run the worker loop until the process is terminated."""
+        db.init_db()
+        logger.info("Starting durable research worker | worker_id=%s", self.worker_id)
+        while not self._stop.is_set():
+            run = db.lease_next_research_run(self.worker_id, lease_seconds=self.lease_seconds)
+            if not run:
+                time.sleep(self.poll_interval_seconds)
+                continue
+            self._execute_leased_run(run)
+
+    def stop(self) -> None:
+        """Ask the worker loop to stop after the current run."""
+        self._stop.set()
+
+    def _execute_leased_run(self, run: dict[str, Any]) -> None:
+        """Execute one leased research run and handle retry/failure state."""
+        run_id = run["id"]
+        db.append_event(
+            run_id,
+            "worker_lease",
+            "running",
+            {"workerId": self.worker_id, "leaseExpiresAt": run.get("lease_expires_at", "")},
+        )
+        heartbeat = _HeartbeatThread(
+            run_id=run_id,
+            worker_id=self.worker_id,
+            lease_seconds=self.lease_seconds,
+            interval_seconds=self.heartbeat_interval_seconds,
+        )
+        heartbeat.start()
+        try:
+            self._service._run_pipeline_job(  # noqa: SLF001 - worker is the durable execution adapter.
+                run_id,
+                run["company_name"],
+                run["ticker"],
+                list(run.get("selected_pillars") or []),
+            )
+        except Exception as exc:  # pragma: no cover - exercised by integration tests with fake runners later.
+            logger.exception("Durable research run failed | run_id=%s", run_id)
+            db.append_event(run_id, "worker_error", "failed", {"workerId": self.worker_id, "error": str(exc)})
+            db.release_research_run_for_retry(run_id, str(exc))
+        finally:
+            heartbeat.stop()
+            heartbeat.join(timeout=2)
+
+
+class _HeartbeatThread(threading.Thread):
+    """Renew the run lease while a durable worker is executing the job."""
+
+    def __init__(self, *, run_id: str, worker_id: str, lease_seconds: int, interval_seconds: float) -> None:
+        super().__init__(name=f"scope-heartbeat-{run_id[:8]}", daemon=True)
+        self._run_id = run_id
+        self._worker_id = worker_id
+        self._lease_seconds = lease_seconds
+        self._interval_seconds = interval_seconds
+        self._stop_event = threading.Event()
+
+    def run(self) -> None:
+        while not self._stop_event.wait(self._interval_seconds):
+            renewed = db.renew_research_run_lease(
+                self._run_id,
+                self._worker_id,
+                lease_seconds=self._lease_seconds,
+            )
+            if not renewed:
+                logger.warning("Unable to renew research lease | run_id=%s", self._run_id)
+                return
+
+    def stop(self) -> None:
+        self._stop_event.set()
+
+
+def _default_worker_id() -> str:
+    suffix = os.getenv("FLY_MACHINE_ID") or os.getenv("HOSTNAME") or socket.gethostname()
+    return f"scope-worker-{suffix}"
+
+
+def main() -> None:
+    """CLI entrypoint used by systemd and Fly process groups."""
+    configure_logging()
+    worker = DurableResearchWorker(
+        poll_interval_seconds=float(os.getenv("RESEARCH_WORKER_POLL_SECONDS", "2")),
+        lease_seconds=int(os.getenv("RESEARCH_LEASE_SECONDS", "300")),
+        heartbeat_interval_seconds=float(os.getenv("RESEARCH_HEARTBEAT_SECONDS", "30")),
+    )
+    worker.run_forever()
+
+
+if __name__ == "__main__":
+    main()

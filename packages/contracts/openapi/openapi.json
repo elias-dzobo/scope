@@ -1,0 +1,2915 @@
+{
+  "components": {
+    "schemas": {
+      "AdvisorConversationResponse": {
+        "description": "Public advisor conversation thread contract.",
+        "properties": {
+          "activeEntities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Activeentities",
+            "type": "array"
+          },
+          "activeGenericResearchId": {
+            "default": "",
+            "title": "Activegenericresearchid",
+            "type": "string"
+          },
+          "activeResearchRunId": {
+            "default": "",
+            "title": "Activeresearchrunid",
+            "type": "string"
+          },
+          "activeThemes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Activethemes",
+            "type": "array"
+          },
+          "activeTopic": {
+            "default": "",
+            "title": "Activetopic",
+            "type": "string"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/AdvisorMessageResponse"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updatedAt": {
+            "title": "Updatedat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "title": "AdvisorConversationResponse",
+        "type": "object"
+      },
+      "AdvisorMessageResponse": {
+        "description": "Public advisor conversation message.",
+        "properties": {
+          "advisorRunId": {
+            "default": "",
+            "title": "Advisorrunid",
+            "type": "string"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "conversationId": {
+            "title": "Conversationid",
+            "type": "string"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "role",
+          "content",
+          "createdAt"
+        ],
+        "title": "AdvisorMessageResponse",
+        "type": "object"
+      },
+      "AdvisorRunRequest": {
+        "description": "Request to run one advisor harness turn.",
+        "properties": {
+          "allowDeepResearch": {
+            "default": false,
+            "description": "Reserved for the next slice where research gaps can launch fresh research.",
+            "title": "Allowdeepresearch",
+            "type": "boolean"
+          },
+          "conversationId": {
+            "default": "",
+            "title": "Conversationid",
+            "type": "string"
+          },
+          "mode": {
+            "default": "auto",
+            "enum": [
+              "auto",
+              "company_research_question",
+              "general_financial_research_question"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "query": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "AdvisorRunRequest",
+        "type": "object"
+      },
+      "AdvisorRunResponse": {
+        "description": "Public advisor run contract.",
+        "properties": {
+          "answer": {
+            "additionalProperties": true,
+            "title": "Answer",
+            "type": "object"
+          },
+          "completedAt": {
+            "default": "",
+            "title": "Completedat",
+            "type": "string"
+          },
+          "contextPack": {
+            "additionalProperties": true,
+            "title": "Contextpack",
+            "type": "object"
+          },
+          "conversationId": {
+            "default": "",
+            "title": "Conversationid",
+            "type": "string"
+          },
+          "coverage": {
+            "additionalProperties": true,
+            "title": "Coverage",
+            "type": "object"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "plan": {
+            "additionalProperties": true,
+            "title": "Plan",
+            "type": "object"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "researchRequests": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Researchrequests",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "trace": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Trace",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "query",
+          "mode",
+          "answer",
+          "plan",
+          "coverage",
+          "createdAt"
+        ],
+        "title": "AdvisorRunResponse",
+        "type": "object"
+      },
+      "ApiEnvelope_RunListResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RunListResponse"
+          },
+          "request_id": {
+            "description": "Correlation id for this request.",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[RunListResponse]",
+        "type": "object"
+      },
+      "ApiEnvelope_RunResultResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RunResultResponse"
+          },
+          "request_id": {
+            "description": "Correlation id for this request.",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[RunResultResponse]",
+        "type": "object"
+      },
+      "ApiEnvelope_RunStatusResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RunStatusResponse"
+          },
+          "request_id": {
+            "description": "Correlation id for this request.",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[RunStatusResponse]",
+        "type": "object"
+      },
+      "ApiEnvelope_StartResearchRunResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StartResearchRunResponse"
+          },
+          "request_id": {
+            "description": "Correlation id for this request.",
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[StartResearchRunResponse]",
+        "type": "object"
+      },
+      "AuthResponse": {
+        "description": "Successful auth response.",
+        "properties": {
+          "accessToken": {
+            "title": "Accesstoken",
+            "type": "string"
+          },
+          "user": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "User",
+            "type": "object"
+          }
+        },
+        "required": [
+          "accessToken",
+          "user"
+        ],
+        "title": "AuthResponse",
+        "type": "object"
+      },
+      "CreateAdvisorConversationRequest": {
+        "description": "Request to create an advisor conversation, optionally seeded by research.",
+        "properties": {
+          "activeEntities": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Activeentities",
+            "type": "array"
+          },
+          "activeGenericResearchId": {
+            "default": "",
+            "title": "Activegenericresearchid",
+            "type": "string"
+          },
+          "activeResearchRunId": {
+            "default": "",
+            "title": "Activeresearchrunid",
+            "type": "string"
+          },
+          "activeThemes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Activethemes",
+            "type": "array"
+          },
+          "activeTopic": {
+            "default": "",
+            "title": "Activetopic",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "title": "CreateAdvisorConversationRequest",
+        "type": "object"
+      },
+      "GoogleLoginRequest": {
+        "description": "Credential posted by Google Identity Services on the frontend.",
+        "properties": {
+          "credential": {
+            "minLength": 1,
+            "title": "Credential",
+            "type": "string"
+          }
+        },
+        "required": [
+          "credential"
+        ],
+        "title": "GoogleLoginRequest",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "OnboardingAnswers": {
+        "description": "Raw answers collected from the onboarding flow.",
+        "properties": {
+          "checkFrequency": {
+            "default": "",
+            "title": "Checkfrequency",
+            "type": "string"
+          },
+          "conservativeDefault": {
+            "default": "",
+            "title": "Conservativedefault",
+            "type": "string"
+          },
+          "country": {
+            "default": "",
+            "title": "Country",
+            "type": "string"
+          },
+          "cryptoComfort": {
+            "default": "",
+            "title": "Cryptocomfort",
+            "type": "string"
+          },
+          "currency": {
+            "default": "",
+            "title": "Currency",
+            "type": "string"
+          },
+          "debtStress": {
+            "default": "",
+            "title": "Debtstress",
+            "type": "string"
+          },
+          "debtTypes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Debttypes",
+            "type": "array"
+          },
+          "dependents": {
+            "default": "",
+            "title": "Dependents",
+            "type": "string"
+          },
+          "emergencyFundMonths": {
+            "default": "",
+            "title": "Emergencyfundmonths",
+            "type": "string"
+          },
+          "existingInvestments": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Existinginvestments",
+            "type": "array"
+          },
+          "incomePredictability": {
+            "default": "",
+            "title": "Incomepredictability",
+            "type": "string"
+          },
+          "investedAmountBand": {
+            "default": "",
+            "title": "Investedamountband",
+            "type": "string"
+          },
+          "investingStyle": {
+            "default": "",
+            "title": "Investingstyle",
+            "type": "string"
+          },
+          "knowledgeLevel": {
+            "default": "",
+            "title": "Knowledgelevel",
+            "type": "string"
+          },
+          "lifestyleLossCapacity": {
+            "default": "",
+            "title": "Lifestylelosscapacity",
+            "type": "string"
+          },
+          "lossReaction": {
+            "default": "",
+            "title": "Lossreaction",
+            "type": "string"
+          },
+          "majorExpenses": {
+            "default": "",
+            "title": "Majorexpenses",
+            "type": "string"
+          },
+          "monthlyDisposableBand": {
+            "default": "",
+            "title": "Monthlydisposableband",
+            "type": "string"
+          },
+          "monthlyIncomeBand": {
+            "default": "",
+            "title": "Monthlyincomeband",
+            "type": "string"
+          },
+          "preferredCompanies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Preferredcompanies",
+            "type": "array"
+          },
+          "preferredMarkets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Preferredmarkets",
+            "type": "array"
+          },
+          "primaryGoal": {
+            "default": "",
+            "title": "Primarygoal",
+            "type": "string"
+          },
+          "priorInvesting": {
+            "default": "",
+            "title": "Priorinvesting",
+            "type": "string"
+          },
+          "priority": {
+            "default": "",
+            "title": "Priority",
+            "type": "string"
+          },
+          "restrictedSectors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Restrictedsectors",
+            "type": "array"
+          },
+          "timeHorizon": {
+            "default": "",
+            "title": "Timehorizon",
+            "type": "string"
+          },
+          "volatileStockResponse": {
+            "default": "",
+            "title": "Volatilestockresponse",
+            "type": "string"
+          },
+          "yearDownReaction": {
+            "default": "",
+            "title": "Yeardownreaction",
+            "type": "string"
+          }
+        },
+        "title": "OnboardingAnswers",
+        "type": "object"
+      },
+      "OnboardingSubmitRequest": {
+        "description": "Persisted onboarding submission.",
+        "properties": {
+          "answers": {
+            "$ref": "#/components/schemas/OnboardingAnswers"
+          }
+        },
+        "required": [
+          "answers"
+        ],
+        "title": "OnboardingSubmitRequest",
+        "type": "object"
+      },
+      "RunListResponse": {
+        "description": "Metadata wrapper for list endpoints.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunStatusResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "RunListResponse",
+        "type": "object"
+      },
+      "RunResultResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "RunResultResponse",
+        "type": "object"
+      },
+      "RunStatusResponse": {
+        "properties": {
+          "activity_count": {
+            "default": 0,
+            "title": "Activity Count",
+            "type": "integer"
+          },
+          "company_name": {
+            "title": "Company Name",
+            "type": "string"
+          },
+          "completed_at": {
+            "default": "",
+            "title": "Completed At",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "current_stage": {
+            "title": "Current Stage",
+            "type": "string"
+          },
+          "current_substep": {
+            "default": "",
+            "title": "Current Substep",
+            "type": "string"
+          },
+          "error_message": {
+            "default": "",
+            "title": "Error Message",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_stalled": {
+            "default": false,
+            "title": "Is Stalled",
+            "type": "boolean"
+          },
+          "last_activity_at": {
+            "default": "",
+            "title": "Last Activity At",
+            "type": "string"
+          },
+          "profile_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile Snapshot"
+          },
+          "profile_snapshot_captured_at": {
+            "default": "",
+            "title": "Profile Snapshot Captured At",
+            "type": "string"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "number"
+          },
+          "selected_pillars": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Selected Pillars",
+            "type": "array"
+          },
+          "stage_progress": {
+            "default": 0,
+            "title": "Stage Progress",
+            "type": "number"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "company_name",
+          "ticker",
+          "selected_pillars",
+          "status",
+          "current_stage",
+          "progress",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RunStatusResponse",
+        "type": "object"
+      },
+      "StartResearchRunRequest": {
+        "properties": {
+          "company_name": {
+            "minLength": 1,
+            "title": "Company Name",
+            "type": "string"
+          },
+          "selected_pillars": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Selected Pillars",
+            "type": "array"
+          },
+          "ticker": {
+            "minLength": 1,
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "company_name",
+          "ticker"
+        ],
+        "title": "StartResearchRunRequest",
+        "type": "object"
+      },
+      "StartResearchRunResponse": {
+        "properties": {
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "status"
+        ],
+        "title": "StartResearchRunResponse",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Scope Stock Research API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/advisor/conversations": {
+      "get": {
+        "description": "List recent advisor conversation threads.",
+        "operationId": "list_conversations_api_v1_advisor_conversations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Conversations Api V1 Advisor Conversations Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Conversations",
+        "tags": [
+          "advisor"
+        ]
+      },
+      "post": {
+        "description": "Create an advisor conversation, optionally anchored to saved research.",
+        "operationId": "create_conversation_api_v1_advisor_conversations_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdvisorConversationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvisorConversationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Conversation",
+        "tags": [
+          "advisor"
+        ]
+      }
+    },
+    "/api/v1/advisor/conversations/{conversation_id}": {
+      "get": {
+        "description": "Load one advisor conversation with all messages.",
+        "operationId": "get_conversation_api_v1_advisor_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvisorConversationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Conversation",
+        "tags": [
+          "advisor"
+        ]
+      }
+    },
+    "/api/v1/advisor/runs": {
+      "get": {
+        "description": "List recent advisor harness runs.",
+        "operationId": "list_runs_api_v1_advisor_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Runs Api V1 Advisor Runs Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Runs",
+        "tags": [
+          "advisor"
+        ]
+      },
+      "post": {
+        "description": "Run one advisor harness turn for the signed-in user.",
+        "operationId": "create_advisor_run_api_v1_advisor_runs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdvisorRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvisorRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Advisor Run",
+        "tags": [
+          "advisor"
+        ]
+      }
+    },
+    "/api/v1/advisor/runs/{run_id}": {
+      "get": {
+        "description": "Get one advisor harness run.",
+        "operationId": "get_run_api_v1_advisor_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdvisorRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run",
+        "tags": [
+          "advisor"
+        ]
+      }
+    },
+    "/api/v1/auth/google": {
+      "post": {
+        "description": "Verify Google identity and issue a Scope JWT plus revocable session cookie.",
+        "operationId": "login_with_google_api_v1_auth_google_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Login With Google",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "Revoke the current browser session.",
+        "operationId": "logout_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Logout Api V1 Auth Logout Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "description": "Return the current authenticated user.",
+        "operationId": "get_me_api_v1_auth_me_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Get Me Api V1 Auth Me Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "Liveness endpoint for platform checks.",
+        "operationId": "health_v1_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health V1 Api V1 Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health V1",
+        "tags": [
+          "research-runs"
+        ]
+      }
+    },
+    "/api/v1/memory/context-plan": {
+      "get": {
+        "description": "Plan retrieval and report whether memory is enough to answer.",
+        "operationId": "context_plan_api_v1_memory_context_plan_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Context Plan Api V1 Memory Context Plan Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Context Plan",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memory/nodes": {
+      "get": {
+        "description": "List graph nodes for lightweight inspection and debugging.",
+        "operationId": "list_nodes_api_v1_memory_nodes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "node_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Node Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Nodes Api V1 Memory Nodes Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Nodes",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/memory/search": {
+      "get": {
+        "description": "Search the signed-in user's saved research memory.",
+        "operationId": "search_memory_api_v1_memory_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "minLength": 0,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Search Memory Api V1 Memory Search Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Search Memory",
+        "tags": [
+          "memory"
+        ]
+      }
+    },
+    "/api/v1/onboarding/profile": {
+      "get": {
+        "description": "Return the current user's onboarding profile.",
+        "operationId": "get_profile_api_v1_onboarding_profile_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Profile Api V1 Onboarding Profile Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Profile",
+        "tags": [
+          "onboarding"
+        ]
+      },
+      "post": {
+        "description": "Save answers and derived financial/risk profile summaries.",
+        "operationId": "save_profile_api_v1_onboarding_profile_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Save Profile Api V1 Onboarding Profile Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Profile",
+        "tags": [
+          "onboarding"
+        ]
+      }
+    },
+    "/api/v1/research-runs": {
+      "get": {
+        "description": "List recent runs with bounded pagination.",
+        "operationId": "list_research_runs_v1_api_v1_research_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticker",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_RunListResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Research Runs V1",
+        "tags": [
+          "research-runs"
+        ]
+      },
+      "post": {
+        "description": "Create an asynchronous research run.\n\nOrchestration itself runs via the service-backed background workers.",
+        "operationId": "create_research_run_v1_api_v1_research_runs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartResearchRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_StartResearchRunResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Research Run V1",
+        "tags": [
+          "research-runs"
+        ]
+      }
+    },
+    "/api/v1/research-runs/{run_id}": {
+      "get": {
+        "description": "Get status/progress for a single run.",
+        "operationId": "get_research_run_v1_api_v1_research_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_RunStatusResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Research Run V1",
+        "tags": [
+          "research-runs"
+        ]
+      }
+    },
+    "/api/v1/research-runs/{run_id}/artifacts": {
+      "get": {
+        "description": "List stored artifacts owned by a research run.",
+        "operationId": "get_research_run_artifacts_v1_api_v1_research_runs__run_id__artifacts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Research Run Artifacts V1",
+        "tags": [
+          "research-runs"
+        ]
+      }
+    },
+    "/api/v1/research-runs/{run_id}/results": {
+      "get": {
+        "description": "Get final result payload for a completed run.",
+        "operationId": "get_research_run_results_v1_api_v1_research_runs__run_id__results_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_RunResultResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Research Run Results V1",
+        "tags": [
+          "research-runs"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Legacy compatibility health endpoint.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/research-runs": {
+      "get": {
+        "description": "List runs (legacy sync path).",
+        "operationId": "list_research_runs_research_runs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ticker",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ticker"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunStatusResponse"
+                  },
+                  "title": "Response List Research Runs Research Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Research Runs"
+      },
+      "post": {
+        "description": "Create run (legacy sync path).\n\nKeeps pre-v1 integrations intact during migration.",
+        "operationId": "create_research_run_research_runs_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartResearchRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartResearchRunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Research Run"
+      }
+    },
+    "/research-runs/{run_id}": {
+      "get": {
+        "description": "Get single run (legacy sync path).",
+        "operationId": "get_research_run_research_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Research Run"
+      }
+    },
+    "/research-runs/{run_id}/artifacts": {
+      "get": {
+        "description": "List artifacts for a run (legacy sync path).",
+        "operationId": "get_research_run_artifacts_research_runs__run_id__artifacts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Research Run Artifacts Research Runs  Run Id  Artifacts Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Research Run Artifacts"
+      }
+    },
+    "/research-runs/{run_id}/results": {
+      "get": {
+        "description": "Get run results (legacy sync path).",
+        "operationId": "get_research_run_results_research_runs__run_id__results_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-api-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "scope_session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scope Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResultResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Research Run Results"
+      }
+    }
+  }
+}

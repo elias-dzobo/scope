@@ -1,0 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-core"
+version = "0.1.0"
+description = "Shared agentic harness — AgentHarness, AgentTool, guardrails"
+requires-python = ">=3.13"
+dependencies = []  # all deps managed at workspace root
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_core"]

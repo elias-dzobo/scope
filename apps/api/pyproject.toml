@@ -1,0 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "scope-api"
+version = "0.1.0"
+description = "Scope FastAPI backend"
+requires-python = ">=3.13"
+dependencies = []  # all deps managed at workspace root
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/scope_api"]

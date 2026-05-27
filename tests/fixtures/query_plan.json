@@ -1,0 +1,13 @@
+{
+  "stock": "Acme Corp",
+  "pillars": [
+    {
+      "pillar_name": "Valuation",
+      "objective": "Estimate fair value and compare multiples",
+      "queries": [
+        {"query": "Acme Corp P/E ratio", "intent": "valuation multiple"},
+        {"query": "Acme Corp EV EBITDA history", "intent": "historical multiple range"}
+      ]
+    }
+  ]
+}

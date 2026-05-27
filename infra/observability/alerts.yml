@@ -1,0 +1,42 @@
+groups:
+  - name: scope-production
+    rules:
+      - alert: ScopeApiHigh5xxRate
+        expr: sum(rate(scope_api_requests_total{status_code=~"5.."}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Scope API is returning elevated 5xx responses.
+
+      - alert: ScopeResearchFailures
+        expr: increase(scope_orchestrator_completion_total{result="failed"}[15m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Research failures exceeded the private beta threshold.
+
+      - alert: ScopeQueueDepthHigh
+        expr: max(scope_orchestrator_queue_depth) > 25
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Research queue depth is high.
+
+      - alert: ScopeWorkerMissing
+        expr: max(scope_orchestrator_workers) < 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: No Scope research workers are reporting.
+
+      - alert: ScopeProviderErrors
+        expr: increase(scope_search_calls_total{status="error"}[15m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Search provider errors are elevated.

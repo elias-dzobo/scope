@@ -1,0 +1,24 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Deploy staging over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: scope
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd /opt/scope/app
+            SCOPE_RELEASE_REF=main ./scripts/deploy_vps.sh

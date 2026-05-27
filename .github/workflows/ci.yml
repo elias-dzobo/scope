@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ["*"]
+  push:
+    branches: ["main"]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Compile check
+        run: uv run python -m compileall apps/api/src packages/research-core/src packages/provider-integrations/src scope_api research_core provider_integrations src scripts main.py api_main.py
+
+      - name: Export OpenAPI contract
+        run: uv run python scripts/export_openapi.py
+
+      - name: Validate migrations
+        run: uv run python scripts/validate_migrations.py
+
+      - name: Run deterministic test gates
+        env:
+          PYTHONPATH: .
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: uv run python -m pytest tests/test_*.py
+
+      - name: Run deterministic advisor evals
+        run: uv run python evaluations/advisor/deepeval_runner.py
+
+      - name: Python dependency audit
+        # diskcache currently has a published advisory with no fixed release.
+        # Keep the ignore explicit so it can be removed as soon as upstream ships a patch.
+        run: uv run python -m pip_audit --ignore-vuln CVE-2025-69872
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.19"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+
+      - name: Node dependency audit
+        run: npm audit --omit=dev

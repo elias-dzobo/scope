@@ -1,0 +1,12 @@
+journeys_dir: journeys
+artifacts_dir: artifacts/runs
+headed: false
+
+# Optional. Defaults to gpt-5.4-mini when OPENAI_API_KEY is present.
+# openai_model: gpt-5.4-mini
+
+# Optional cloud dashboard settings. V1 runs locally; these fields are reserved
+# for upload/linking once Horus Cloud is enabled.
+cloud:
+  # dashboard_url: https://app.horus.dev
+  # project_id: your-project-id
