@@ -50,20 +50,17 @@ const App: React.FC = () => {
     fetchOnboardingProfile(token)
       .then((loaded) => {
         setProfile(loaded);
-        setCurrentView((current) => {
-          // null means 404 — profile genuinely doesn't exist yet
-          if (!loaded) return ViewMode.ONBOARDING;
-          return current === ViewMode.LANDING || current === ViewMode.ONBOARDING ? ViewMode.HOME : current;
-        });
-        if (loaded) void loadRuns();
+        // Onboarding is now optional — go to HOME whether profile exists or not.
+        // If no profile, HomeDashboard will show a nudge to complete it.
+        setCurrentView((current) =>
+          current === ViewMode.LANDING || current === ViewMode.ONBOARDING ? ViewMode.HOME : current,
+        );
+        void loadRuns();
       })
       .catch(() => {
-        // Network / server error — profile may well exist; don't destroy the
-        // session by redirecting to ONBOARDING. Keep whatever view is current
-        // (usually LANDING on first load) so the user can retry naturally.
-        // Leave profile state untouched so a stale cached profile is preserved.
+        // Network / server error — keep whatever view is current so the user can retry.
         setCurrentView((current) =>
-          current === ViewMode.LANDING ? ViewMode.LANDING : current,
+          current === ViewMode.LANDING ? ViewMode.HOME : current,
         );
       })
       .finally(() => setProfileLoading(false));
@@ -202,6 +199,7 @@ const App: React.FC = () => {
     <div className="h-screen w-full overflow-hidden bg-bg-base text-text-primary">
       <TopNav
         activeView={currentView}
+        profileComplete={!!profile}
         onViewChange={(view) => {
           if (view === ViewMode.ADVISOR) {
             setAdvisorSeed(null);
@@ -219,16 +217,13 @@ const App: React.FC = () => {
           <div className="mx-auto max-w-[900px] px-6 py-16 text-[15px] text-text-secondary md:px-10">Loading your workspace…</div>
         ) : !user ? (
           <LandingPage />
-        ) : !profile ? (
-          <OnboardingProfile
-            onComplete={(saved) => {
-              setProfile(saved);
-              setCurrentView(ViewMode.HOME);
-              void loadRuns();
-            }}
-          />
         ) : currentView === ViewMode.HOME ? (
-          <HomeDashboard profile={profile} recentRuns={runs} onNavigate={setCurrentView} onOpenRun={(runId) => void openRun(runId)} />
+          <HomeDashboard
+            profile={profile}
+            recentRuns={runs}
+            onNavigate={setCurrentView}
+            onOpenRun={(runId) => void openRun(runId)}
+          />
         ) : currentView === ViewMode.INITIATE ? (
           <InitiateResearch onSearch={handleSearch} loading={loading} runStatus={runStatus} error={error} />
         ) : currentView === ViewMode.RUNS ? (
@@ -259,6 +254,7 @@ const App: React.FC = () => {
               setProfile(saved);
               setCurrentView(ViewMode.HOME);
             }}
+            onSkip={() => setCurrentView(ViewMode.HOME)}
           />
         ) : currentView === ViewMode.ADVISOR ? (
           <ErrorBoundary>

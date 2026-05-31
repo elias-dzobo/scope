@@ -45,7 +45,7 @@ const REQUIRED_BY_STEP: Array<Array<keyof OnboardingAnswers>> = [
   [],
 ];
 
-export const OnboardingProfile: React.FC<{ onComplete?: (profile: Profile) => void }> = ({ onComplete }) => {
+export const OnboardingProfile: React.FC<{ onComplete?: (profile: Profile) => void; onSkip?: () => void }> = ({ onComplete, onSkip }) => {
   const { token, user } = useAuth();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<OnboardingAnswers>(INITIAL);
@@ -111,7 +111,17 @@ export const OnboardingProfile: React.FC<{ onComplete?: (profile: Profile) => vo
     <div className="h-full overflow-y-auto custom-scrollbar">
       <div className="mx-auto flex w-full max-w-[1120px] flex-col px-6 pb-16 pt-10 md:px-10 md:pt-16">
         <section className="border-b border-line-subtle pb-8">
-          <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Investor profile</p>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Investor profile</p>
+            {onSkip && !profile && (
+              <button
+                onClick={onSkip}
+                className="text-[11px] uppercase tracking-[0.16em] text-text-muted underline-offset-2 hover:text-text-secondary hover:underline"
+              >
+                Skip for now
+              </button>
+            )}
+          </div>
           <h1 className="mt-6 font-display text-[clamp(2.8rem,7vw,4.8rem)] leading-[0.98] tracking-[-0.04em] text-text-primary">
             Build your recommendation context.
           </h1>

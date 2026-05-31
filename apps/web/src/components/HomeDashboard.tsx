@@ -2,7 +2,7 @@ import React from 'react';
 import { OnboardingProfile, RunListItem, ViewMode } from '../types/api';
 
 interface Props {
-  profile: OnboardingProfile;
+  profile: OnboardingProfile | null;
   recentRuns: RunListItem[];
   onNavigate: (view: ViewMode) => void;
   onOpenRun: (runId: string) => void;
@@ -11,21 +11,51 @@ interface Props {
 export const HomeDashboard: React.FC<Props> = ({ profile, recentRuns, onNavigate, onOpenRun }) => (
   <div className="h-full overflow-y-auto custom-scrollbar">
     <div className="mx-auto flex w-full max-w-[1180px] flex-col px-6 pb-16 pt-10 md:px-10 md:pt-16">
+
+      {/* Profile nudge banner — only shown when profile is incomplete */}
+      {!profile && (
+        <div className="mb-8 flex items-start justify-between gap-6 border border-line-strong bg-surface-panel px-6 py-5">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-text-muted">Personalisation off</p>
+            <p className="mt-2 max-w-[560px] text-[14px] leading-7 text-text-secondary">
+              Research scores and advisor answers are generic right now. Complete your investor profile to get risk-adjusted analysis tailored to your goals, financial cushion, and tolerance for loss.
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate(ViewMode.ONBOARDING)}
+            className="shrink-0 border border-text-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-primary transition hover:bg-text-primary hover:text-white"
+          >
+            Complete profile
+          </button>
+        </div>
+      )}
+
       <section className="grid grid-cols-1 gap-10 border-b border-line-subtle pb-10 lg:grid-cols-[minmax(0,1.2fr)_340px]">
         <div>
           <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Home</p>
           <h1 className="mt-6 max-w-[780px] font-display text-[clamp(3rem,7vw,5.4rem)] leading-[0.94] tracking-[-0.04em] text-text-primary">
-            Your research workspace is ready.
+            {profile
+              ? 'Your research workspace is ready.'
+              : 'Start researching companies.'}
           </h1>
           <p className="mt-6 max-w-[700px] text-[17px] leading-9 text-text-secondary">
-            {profile.profileNarrative?.headline || profile.summary}
+            {profile
+              ? (profile.profileNarrative?.headline || profile.summary)
+              : 'Run a company through Scope\'s six-pillar analysis. Add your investor profile anytime to unlock personalised risk-fit scoring.'}
           </p>
         </div>
+
         <aside className="space-y-5">
-          <ProfileMetric label="Risk tolerance" value={String(profile.riskProfile.riskTolerance || 'Unknown')} />
-          <ProfileMetric label="Risk capacity" value={String(profile.riskProfile.riskCapacity || 'Unknown')} />
-          <ProfileMetric label="Financial resilience" value={String(profile.financialProfile.financialResilience || 'Unknown')} />
-          <ProfileMetric label="Profile version" value={profile.profileVersion} />
+          {profile ? (
+            <>
+              <ProfileMetric label="Risk tolerance" value={String(profile.riskProfile.riskTolerance || 'Unknown')} />
+              <ProfileMetric label="Risk capacity" value={String(profile.riskProfile.riskCapacity || 'Unknown')} />
+              <ProfileMetric label="Financial resilience" value={String(profile.financialProfile.financialResilience || 'Unknown')} />
+              <ProfileMetric label="Profile version" value={profile.profileVersion} />
+            </>
+          ) : (
+            <ProfileNudgeCard onNavigate={onNavigate} />
+          )}
         </aside>
       </section>
 
@@ -61,6 +91,33 @@ export const HomeDashboard: React.FC<Props> = ({ profile, recentRuns, onNavigate
         </div>
       </section>
     </div>
+  </div>
+);
+
+const ProfileNudgeCard = ({ onNavigate }: { onNavigate: (view: ViewMode) => void }) => (
+  <div className="border border-line-subtle p-5">
+    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-text-muted">Investor profile</p>
+    <p className="mt-3 text-[14px] leading-7 text-text-secondary">
+      A completed profile unlocks risk-fit scoring, personalised advisor answers, and analysis anchored to your actual financial situation.
+    </p>
+    <div className="mt-5 space-y-2 border-t border-line-subtle pt-4">
+      <NudgeItem text="Risk-adjusted company scores" />
+      <NudgeItem text="Advisor answers that fit your goals" />
+      <NudgeItem text="Sector and style preferences applied" />
+    </div>
+    <button
+      onClick={() => onNavigate(ViewMode.ONBOARDING)}
+      className="mt-5 w-full border border-text-primary py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-text-primary transition hover:bg-text-primary hover:text-white"
+    >
+      Build your profile →
+    </button>
+  </div>
+);
+
+const NudgeItem = ({ text }: { text: string }) => (
+  <div className="flex items-center gap-2">
+    <span className="h-1 w-1 rounded-full bg-text-muted" />
+    <p className="text-[13px] text-text-secondary">{text}</p>
   </div>
 );
 

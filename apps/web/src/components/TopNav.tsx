@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider';
 
 interface Props {
   activeView: ViewMode;
+  profileComplete: boolean;
   onViewChange: (view: ViewMode) => void;
 }
 
@@ -15,7 +16,7 @@ const NAV_ITEMS: Array<{ label: string; view: ViewMode }> = [
   { label: 'Profile', view: ViewMode.ONBOARDING },
 ];
 
-export const TopNav: React.FC<Props> = ({ activeView, onViewChange }) => {
+export const TopNav: React.FC<Props> = ({ activeView, profileComplete, onViewChange }) => {
   const { user, loading, googleReady, signOut } = useAuth();
 
   return (
@@ -31,15 +32,22 @@ export const TopNav: React.FC<Props> = ({ activeView, onViewChange }) => {
         <nav className="flex items-center gap-3 md:gap-5">
           {user ? NAV_ITEMS.map((item) => {
             const active = activeView === item.view;
+            const isProfile = item.view === ViewMode.ONBOARDING;
             return (
               <button
                 key={item.label}
                 onClick={() => onViewChange(item.view)}
-                className={`px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition ${
+                className={`relative px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition ${
                   active ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
                 {item.label}
+                {isProfile && !profileComplete && (
+                  <span
+                    className="absolute right-0 top-1.5 h-[5px] w-[5px] rounded-full bg-accent-risk"
+                    title="Complete your investor profile for personalized analysis"
+                  />
+                )}
               </button>
             );
           }) : null}
