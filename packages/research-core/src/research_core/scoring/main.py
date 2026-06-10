@@ -13,6 +13,11 @@ from langchain_openai import ChatOpenAI
 
 from scope_api.observability.metrics import parse_llm_usage, record_llm_call
 from scope_api.observability.telemetry import observe_span
+from research_core.harness.asset_class import (
+    AssetClass,
+    get_pillar_signals,
+    get_pillar_weights,
+)
 from research_core.prompts.tool_prompts import EVIDENCE_EXTRACTION_PROMPT
 from research_core.schemas.tool_schema import (
     EvidenceFact,
@@ -26,41 +31,22 @@ logger = get_logger(__name__)
 ProgressCallback = Callable[[str, dict[str, Any]], None]
 
 
-PILLAR_SIGNALS: dict[str, dict[str, list[str]]] = {
-    "Macro & Industry": {
-        "Secular Trends": ["trend", "growth", "demand", "outlook", "cagr", "tam"],
-        "Market Structure": ["market share", "industry", "competition", "regulation"],
-    },
-    "Economic Moat": {
-        "Switching Costs": ["switching", "retention", "contract", "renewal"],
-        "Competitive Advantage": ["brand", "patent", "network effect", "cost advantage"],
-    },
-    "Financial Engine": {
-        "Profitability": ["roic", "margin", "ebitda", "eps", "profit"],
-        "Cash and Leverage": ["free cash flow", "fcf", "debt", "debt/ebitda", "balance sheet"],
-    },
-    "Management & Capital Allocation": {
-        "Capital Allocation": ["buyback", "dividend", "acquisition", "allocation"],
-        "Governance": ["insider", "ownership", "board", "governance", "management"],
-    },
-    "Valuation": {
-        "Multiples": ["p/e", "ev/ebitda", "multiple", "valuation", "price target"],
-        "Intrinsic Value": ["dcf", "fair value", "discount", "upside", "margin of safety"],
-    },
-    "Technical Analysis": {
-        "Trend and Momentum": ["moving average", "breakout", "rsi", "momentum", "uptrend"],
-        "Volume and Relative Strength": ["volume", "accumulation", "relative strength", "support", "resistance"],
-    },
-}
+# Legacy flat dicts kept for backward-compat call sites that haven't migrated.
+# Canonical per-asset-class mappings live in research_core.harness.asset_class.
+PILLAR_SIGNALS: dict[str, dict[str, list[str]]] = get_pillar_signals(AssetClass.EQUITY_STOCK)
+PILLAR_WEIGHTS: dict[str, float] = get_pillar_weights(AssetClass.EQUITY_STOCK)
 
-PILLAR_WEIGHTS: dict[str, float] = {
-    "Macro & Industry": 0.15,
-    "Economic Moat": 0.2,
-    "Financial Engine": 0.25,
-    "Management & Capital Allocation": 0.15,
-    "Valuation": 0.15,
-    "Technical Analysis": 0.1,
-}
+
+def _resolve_asset_class(asset_class: AssetClass | str | None) -> AssetClass:
+    """Coerce string or None to an AssetClass, defaulting to EQUITY_STOCK."""
+    if asset_class is None:
+        return AssetClass.EQUITY_STOCK
+    if isinstance(asset_class, AssetClass):
+        return asset_class
+    try:
+        return AssetClass(asset_class)
+    except ValueError:
+        return AssetClass.EQUITY_STOCK
 
 SCORECARD_SYNTHESIS_MODEL = os.getenv("SCORECARD_SYNTHESIS_MODEL", "gpt-4o-mini")
 SCORECARD_SYNTHESIS_SYSTEM = """You are Scope's investment research scoring agent.
@@ -255,8 +241,10 @@ def _extract_pillar_evidence_llm(
     ticker: str,
     pillar_name: str,
     documents: list[dict],
+    asset_class: AssetClass = AssetClass.EQUITY_STOCK,
 ) -> list[dict]:
-    allowed_signals = list(PILLAR_SIGNALS.get(pillar_name, {}).keys())
+    pillar_signal_map = get_pillar_signals(asset_class)
+    allowed_signals = list(pillar_signal_map.get(pillar_name, {}).keys())
     if not documents or not allowed_signals:
         return []
 
@@ -279,9 +267,11 @@ def _extract_pillar_evidence_deterministic(
     ticker: str,
     pillar_name: str,
     documents: list[dict],
+    asset_class: AssetClass = AssetClass.EQUITY_STOCK,
 ) -> list[dict]:
     """Extract evidence facts from scraped documents using deterministic signal matching."""
-    pillar_signals = PILLAR_SIGNALS.get(pillar_name, {})
+    pillar_signal_map = get_pillar_signals(asset_class)
+    pillar_signals = pillar_signal_map.get(pillar_name, {})
     facts: list[dict] = []
     entity_terms = _build_entity_terms(stock_name, ticker)
 
@@ -316,7 +306,9 @@ def extract_evidence_facts(
     ticker: str = "",
     llm_enabled: bool | None = None,
     progress_callback: ProgressCallback | None = None,
+    asset_class: AssetClass | str | None = None,
 ) -> dict[str, list[dict]]:
+    ac = _resolve_asset_class(asset_class)
     evidence_by_pillar: dict[str, list[dict]] = {}
     should_use_llm = llm_enabled if llm_enabled is not None else bool(os.getenv("OPENAI_API_KEY"))
     total_pillars = len(scraped_results)
@@ -325,7 +317,7 @@ def extract_evidence_facts(
     for pillar_name, documents in scraped_results.items():
         if should_use_llm and documents:
             try:
-                facts = _extract_pillar_evidence_llm(stock_name, ticker, pillar_name, documents)
+                facts = _extract_pillar_evidence_llm(stock_name, ticker, pillar_name, documents, asset_class=ac)
                 evidence_by_pillar[pillar_name] = facts
                 completed_pillars += 1
                 if progress_callback:
@@ -350,6 +342,7 @@ def extract_evidence_facts(
             ticker=ticker,
             pillar_name=pillar_name,
             documents=documents,
+            asset_class=ac,
         )
         completed_pillars += 1
         if progress_callback:
@@ -524,7 +517,9 @@ def _build_stock_scorecard_llm(
     ):
         started = time.perf_counter()
         model = ChatOpenAI(model=SCORECARD_SYNTHESIS_MODEL, temperature=0.1)
-        structured = model.with_structured_output(StockScorecard)
+        # dict[str, X] fields are not supported by OpenAI strict structured output;
+        # use function_calling mode which accepts arbitrary Pydantic schemas.
+        structured = model.with_structured_output(StockScorecard, method="function_calling")
         parsed = structured.invoke(
             [
                 ("system", SCORECARD_SYNTHESIS_SYSTEM),
@@ -554,12 +549,17 @@ def _build_stock_scorecard_llm(
     return scorecard
 
 
-def assess_pillars(evidence_by_pillar: dict[str, list[dict]]) -> dict[str, dict]:
+def assess_pillars(
+    evidence_by_pillar: dict[str, list[dict]],
+    asset_class: AssetClass | str | None = None,
+) -> dict[str, dict]:
     """Create pillar-level assessments using evidence density and signal coverage."""
+    ac = _resolve_asset_class(asset_class)
+    pillar_signal_map = get_pillar_signals(ac)
     assessments: dict[str, dict] = {}
 
     for pillar_name, facts in evidence_by_pillar.items():
-        configured_signals = list(PILLAR_SIGNALS.get(pillar_name, {}).keys())
+        configured_signals = list(pillar_signal_map.get(pillar_name, {}).keys())
         configured_signal_set = set(configured_signals)
         total_signals = len(configured_signals) if configured_signals else 1
 
@@ -623,6 +623,7 @@ def build_stock_scorecard(
     pillar_assessments: dict[str, dict],
     evidence_by_pillar: dict[str, list[dict]] | None = None,
     llm_enabled: bool | None = None,
+    asset_class: AssetClass | str | None = None,
 ) -> dict:
     """Aggregate pillar assessments into a final scorecard and recommendation.
 
@@ -652,9 +653,14 @@ def build_stock_scorecard(
         out["scorecard_source"] = "deterministic_fallback"
         return out
 
+    ac = _resolve_asset_class(asset_class)
+    weights = get_pillar_weights(ac)
+
     pillar_scores = {pillar: int(assessment["score"]) for pillar, assessment in pillar_assessments.items()}
     pillar_confidences = [float(assessment["confidence"]) for assessment in pillar_assessments.values()]
-    available_weights = {pillar: PILLAR_WEIGHTS.get(pillar, 0.0) for pillar in pillar_scores}
+
+    # Normalize weights to only the pillars present (handles partial pillar sets)
+    available_weights = {pillar: weights.get(pillar, 0.0) for pillar in pillar_scores}
     weight_sum = sum(available_weights.values()) or 1.0
     normalized_weights = {pillar: weight / weight_sum for pillar, weight in available_weights.items()}
 
@@ -681,12 +687,35 @@ def build_stock_scorecard(
         }
     pillars_with_sufficient_data = sum(1 for count in evidence_counts.values() if count >= 2)
 
-    valuation_score = pillar_scores.get("Valuation", 0)
-    technical_score = pillar_scores.get("Technical Analysis", 0)
-    financial_score = pillar_scores.get("Financial Engine", 0)
-    moat_score = pillar_scores.get("Economic Moat", 0)
+    # Asset-class-aware valuation and technical pillar lookups.
+    # For non-equity asset classes the canonical pillar names differ, so we
+    # search for the closest match rather than hardcoding "Valuation".
+    _valuation_pillar = next(
+        (p for p in pillar_scores if "valuation" in p.lower() or "yield" in p.lower()),
+        None,
+    )
+    _technical_pillar = next(
+        (p for p in pillar_scores if "technical" in p.lower() or "performance" in p.lower() or "tracking" in p.lower()),
+        None,
+    )
+    _quality_pillar = next(
+        (p for p in pillar_scores if any(k in p.lower() for k in ("financial engine", "path to profit", "fund performance", "credit quality", "distribution"))),
+        None,
+    )
+    _moat_pillar = next(
+        (p for p in pillar_scores if any(k in p.lower() for k in ("moat", "competitive", "technology", "index", "portfolio quality"))),
+        None,
+    )
 
-    if evidence_counts.get("Valuation", 0) < 2:
+    valuation_score  = pillar_scores.get(_valuation_pillar, 0) if _valuation_pillar else 0
+    technical_score  = pillar_scores.get(_technical_pillar, 0) if _technical_pillar else 0
+    financial_score  = pillar_scores.get(_quality_pillar, 0)   if _quality_pillar  else 0
+    moat_score       = pillar_scores.get(_moat_pillar, 0)       if _moat_pillar     else 0
+
+    val_evidence = evidence_counts.get(_valuation_pillar, 0) if _valuation_pillar else 0
+    tech_evidence = evidence_counts.get(_technical_pillar, 0) if _technical_pillar else 0
+
+    if val_evidence < 2:
         valuation_status = "Unknown"
     elif valuation_score >= 75:
         valuation_status = "Undervalued"
@@ -695,7 +724,7 @@ def build_stock_scorecard(
     else:
         valuation_status = "Overvalued"
 
-    if evidence_counts.get("Technical Analysis", 0) < 2:
+    if tech_evidence < 2:
         technical_state = "Unknown"
     elif technical_score >= 70:
         technical_state = "Bullish Trend"

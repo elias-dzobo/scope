@@ -13,7 +13,7 @@ from typing import Any
 
 import requests
 
-from research_core.scoring.main import PILLAR_SIGNALS
+from research_core.harness.asset_class import AssetClass, get_pillar_signals
 from research_core.harness.models import (
     GroundedCitationSupport,
     GroundedResearchResult,
@@ -184,7 +184,17 @@ def _evidence_from_supports(
     brief: ResearchBrief | None = None,
 ) -> list[dict[str, Any]]:
     pillar = workstream.pillar_name or workstream.title
-    signal_map = PILLAR_SIGNALS.get(pillar, {})
+    # Resolve asset class from the brief so ETF/fund/REIT signal maps are used.
+    _raw_ac = ""
+    if brief and brief.entities:
+        _raw_ac = brief.entities[0].asset_class or ""
+    if not _raw_ac and brief:
+        _raw_ac = brief.constraints.get("asset_class", "")
+    try:
+        _ac = AssetClass(_raw_ac) if _raw_ac else AssetClass.EQUITY_STOCK
+    except ValueError:
+        _ac = AssetClass.EQUITY_STOCK
+    signal_map = get_pillar_signals(_ac).get(pillar, {})
     by_id = {source.source_id: source for source in sources}
     evidence: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()

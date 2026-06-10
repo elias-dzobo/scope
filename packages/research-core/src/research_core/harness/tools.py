@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 from pathlib import Path
 
+from research_core.harness.asset_class import AssetClass
 from research_core.scoring.main import assess_pillars, build_stock_scorecard
 from research_core.harness.documents import (
     DOCUMENT_QUERIES,
@@ -61,21 +62,19 @@ class ResearchToolFacade:
         payload = call_gemini_grounded(prompt)
         return parse_grounded_response(payload, workstream, brief=brief)
 
-    def discover_primary_documents(
+    def run_document_search_queries(
         self,
         company_name: str,
         ticker: str,
-        grounded_results: list[GroundedResearchResult] | None = None,
-        max_documents: int = 8,
-    ) -> list[PrimaryDocument]:
-        """Discover canonical primary documents from grounding sources and search."""
-        candidates: list[dict[str, Any]] = []
-        for grounded in grounded_results or []:
-            for source in grounded.sources:
-                if source.url:
-                    candidates.append({"title": source.title, "link": source.url, "snippet": grounded.answer[:500], "provider": "gemini_grounding"})
+    ) -> list[dict[str, Any]]:
+        """Run the parallel DOCUMENT_QUERIES and return raw candidate dicts.
 
-        candidates_lock = threading.Lock()
+        This is intentionally separated from ``discover_primary_documents`` so
+        callers can fire it in a background thread while grounded research is
+        running, then pass the pre-fetched candidates once both tasks are done.
+        """
+        raw_candidates: list[dict[str, Any]] = []
+        lock = threading.Lock()
 
         def _search_one(discovery_type: str, template: str) -> list[dict[str, Any]]:
             query = template.format(company=company_name, ticker=ticker)
@@ -95,10 +94,36 @@ class ResearchToolFacade:
             for future in as_completed(futures):
                 try:
                     batch = future.result()
-                    with candidates_lock:
-                        candidates.extend(batch)
+                    with lock:
+                        raw_candidates.extend(batch)
                 except Exception:
-                    pass  # skip failed discovery queries — we still have others
+                    pass
+        return raw_candidates
+
+    def discover_primary_documents(
+        self,
+        company_name: str,
+        ticker: str,
+        grounded_results: list[GroundedResearchResult] | None = None,
+        max_documents: int = 8,
+        pre_fetched_candidates: list[dict[str, Any]] | None = None,
+    ) -> list[PrimaryDocument]:
+        """Discover canonical primary documents from grounding sources and search.
+
+        If ``pre_fetched_candidates`` is provided (from a background
+        ``run_document_search_queries`` call), the search step is skipped and
+        those candidates are used directly — saving ~5-15s of serial latency.
+        """
+        candidates: list[dict[str, Any]] = []
+        for grounded in grounded_results or []:
+            for source in grounded.sources:
+                if source.url:
+                    candidates.append({"title": source.title, "link": source.url, "snippet": grounded.answer[:500], "provider": "gemini_grounding"})
+
+        if pre_fetched_candidates is not None:
+            candidates.extend(pre_fetched_candidates)
+        else:
+            candidates.extend(self.run_document_search_queries(company_name, ticker))
 
         return self._rank_document_candidates(company_name, ticker, candidates, max_documents=max_documents)
 
@@ -159,9 +184,17 @@ class ResearchToolFacade:
             selected_pillars=[workstream.pillar_name or workstream.title],
         )
 
-    def assess_pillars(self, evidence_by_pillar: dict[str, list[dict]]) -> dict[str, dict]:
-        """Assess pillars using the existing deterministic scoring layer."""
-        return assess_pillars(evidence_by_pillar)
+    def assess_pillars(
+        self,
+        evidence_by_pillar: dict[str, list[dict]],
+        asset_class: AssetClass | str | None = None,
+    ) -> dict[str, dict]:
+        """Assess pillars using the deterministic scoring layer.
+
+        Passes the asset class so the scorer uses the correct signal map
+        (fund signals, ETF signals, etc.) rather than the equity defaults.
+        """
+        return assess_pillars(evidence_by_pillar, asset_class=asset_class)
 
     def build_scorecard(
         self,
@@ -169,14 +202,18 @@ class ResearchToolFacade:
         ticker: str,
         pillar_assessments: dict[str, dict],
         evidence_by_pillar: dict[str, list[dict]],
+        asset_class: AssetClass | str | None = None,
     ) -> dict[str, Any]:
-        """Build the final stock scorecard.
+        """Build the final scorecard with asset-class-aware weights.
 
-        The scoring layer now supports optional LLM-assisted synthesis behind a
+        The scoring layer supports optional LLM-assisted synthesis behind a
         deterministic fallback. This facade preserves the harness contract while
         allowing `SCORECARD_LLM_ENABLED=true` to make recommendations less rigid.
         """
-        return build_stock_scorecard(company_name, ticker, pillar_assessments, evidence_by_pillar)
+        return build_stock_scorecard(
+            company_name, ticker, pillar_assessments, evidence_by_pillar,
+            asset_class=asset_class,
+        )
 
     def run_existing_company_pipeline(
         self,

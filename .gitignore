@@ -33,3 +33,9 @@ data.json
 
 # Local scratch / downloaded files
 downloaded_files/
+
+# Build cache, editor, and run logs
+.vite/
+.claude/
+latest_logs/
+*.log

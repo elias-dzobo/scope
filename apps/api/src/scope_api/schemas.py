@@ -7,7 +7,7 @@ from typing import TypeVar, Generic
 
 from pydantic import BaseModel, Field, field_validator
 
-from scope_api.service import ALL_PILLARS
+from scope_api.application.run_service import ALL_VALID_PILLARS
 
 T = TypeVar("T")
 
@@ -22,8 +22,7 @@ class StartResearchRunRequest(BaseModel):
     def validate_pillars(cls, value: list[str]) -> list[str]:
         if not value:
             return value
-        allowed = set(ALL_PILLARS)
-        invalid = [pillar for pillar in value if pillar not in allowed]
+        invalid = [pillar for pillar in value if pillar not in ALL_VALID_PILLARS]
         if invalid:
             raise ValueError(f"Unsupported pillars: {', '.join(invalid)}")
         return value

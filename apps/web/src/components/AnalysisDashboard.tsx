@@ -1,11 +1,224 @@
-import React from 'react';
-import { ResearchRunData, PillarTakeaway } from '../types/api';
+import React, { useState } from 'react';
+import { ResearchRunData, PillarTakeaway, EvidenceFact } from '../types/api';
 
 interface Props {
   data: ResearchRunData;
   onAskAdvisor?: (query: string) => void;
 }
 
+// ---------------------------------------------------------------------------
+// Lightweight markdown renderer — handles bold, italic, bullets, numbered
+// lists, and paragraph breaks without any external dependency.
+// ---------------------------------------------------------------------------
+const Markdown: React.FC<{ text: string; className?: string }> = ({ text, className }) => {
+  if (!text) return null;
+
+  const renderInline = (raw: string): React.ReactNode[] => {
+    const parts: React.ReactNode[] = [];
+    let remaining = raw;
+    let key = 0;
+
+    while (remaining.length) {
+      const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*/s);
+      const italicMatch = remaining.match(/^(.*?)(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/s);
+
+      const boldIdx = boldMatch ? boldMatch[1].length : Infinity;
+      const italicIdx = italicMatch ? italicMatch[1].length : Infinity;
+
+      if (boldMatch && boldIdx <= italicIdx) {
+        if (boldMatch[1]) parts.push(<React.Fragment key={key++}>{boldMatch[1]}</React.Fragment>);
+        parts.push(<strong key={key++}>{boldMatch[2]}</strong>);
+        remaining = remaining.slice(boldMatch[0].length);
+      } else if (italicMatch) {
+        if (italicMatch[1]) parts.push(<React.Fragment key={key++}>{italicMatch[1]}</React.Fragment>);
+        parts.push(<em key={key++}>{italicMatch[2]}</em>);
+        remaining = remaining.slice(italicMatch[0].length);
+      } else {
+        parts.push(<React.Fragment key={key++}>{remaining}</React.Fragment>);
+        break;
+      }
+    }
+    return parts;
+  };
+
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+  let eKey = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Heading
+    if (/^#{1,3}\s/.test(line)) {
+      const content = line.replace(/^#{1,3}\s/, '');
+      elements.push(
+        <p key={eKey++} className="mt-4 text-[15px] font-semibold text-text-primary">
+          {renderInline(content)}
+        </p>
+      );
+      i++;
+      continue;
+    }
+
+    // Bullet list — collect consecutive bullet lines
+    if (/^[-*]\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*]\s/.test(lines[i])) {
+        items.push(lines[i].replace(/^[-*]\s/, ''));
+        i++;
+      }
+      elements.push(
+        <ul key={eKey++} className="mt-3 space-y-2 pl-4">
+          {items.map((item, idx) => (
+            <li key={idx} className="flex gap-2 text-[15px] leading-7 text-text-secondary">
+              <span className="mt-[0.45em] h-[5px] w-[5px] flex-shrink-0 rounded-full bg-text-muted" />
+              <span>{renderInline(item)}</span>
+            </li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    // Numbered list
+    if (/^\d+\.\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+        items.push(lines[i].replace(/^\d+\.\s/, ''));
+        i++;
+      }
+      elements.push(
+        <ol key={eKey++} className="mt-3 space-y-2 pl-4">
+          {items.map((item, idx) => (
+            <li key={idx} className="flex gap-3 text-[15px] leading-7 text-text-secondary">
+              <span className="flex-shrink-0 font-mono text-[12px] text-text-muted">{idx + 1}.</span>
+              <span>{renderInline(item)}</span>
+            </li>
+          ))}
+        </ol>
+      );
+      continue;
+    }
+
+    // Blank line — skip
+    if (!line.trim()) {
+      i++;
+      continue;
+    }
+
+    // Regular paragraph
+    elements.push(
+      <p key={eKey++} className="mt-3 text-[15px] leading-8 text-text-secondary first:mt-0">
+        {renderInline(line)}
+      </p>
+    );
+    i++;
+  }
+
+  return <div className={className}>{elements}</div>;
+};
+
+// ---------------------------------------------------------------------------
+// Score bar — thin coloured indicator beneath a numeric score
+// ---------------------------------------------------------------------------
+const ScoreBar: React.FC<{ score: number }> = ({ score }) => {
+  const colour =
+    score >= 75 ? 'bg-accent-positive' :
+    score >= 60 ? 'bg-accent-brand' :
+    score >= 45 ? 'bg-accent-warning' :
+    'bg-accent-risk';
+
+  return (
+    <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-bg-panel">
+      <div className={`h-full rounded-full ${colour} transition-all`} style={{ width: `${score}%` }} />
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Evidence card — structured display for one evidence fact
+// ---------------------------------------------------------------------------
+const EvidenceCard: React.FC<{ fact: EvidenceFact }> = ({ fact }) => {
+  const hasMetric = fact.metric_name && fact.metric_value;
+  return (
+    <div className="rounded border border-line-subtle bg-bg-panel px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-brand">
+          {fact.signal_name}
+        </span>
+        {hasMetric && (
+          <span className="font-mono text-[12px] text-text-primary">
+            {fact.metric_name}: <strong>{fact.metric_value}</strong>
+            {fact.period ? ` (${fact.period})` : ''}
+          </span>
+        )}
+        {fact.source_title && (
+          <span className="ml-auto text-[11px] text-text-muted">{fact.source_title}</span>
+        )}
+      </div>
+      {fact.excerpt && (
+        <p className="mt-2 text-[13px] leading-6 text-text-secondary">{fact.excerpt}</p>
+      )}
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+const categoryTone = (category: string) => {
+  switch (category.toLowerCase()) {
+    case 'bullish':   return 'text-accent-positive';
+    case 'cautious':  return 'text-accent-warning';
+    case 'weak':      return 'text-accent-risk';
+    case 'insufficient data': return 'text-text-muted';
+    default:          return 'text-accent-info';
+  }
+};
+
+const categoryBg = (category: string) => {
+  switch (category.toLowerCase()) {
+    case 'bullish':   return 'bg-accent-positive/10 text-accent-positive';
+    case 'cautious':  return 'bg-accent-warning/10 text-accent-warning';
+    case 'weak':      return 'bg-accent-risk/10 text-accent-risk';
+    case 'insufficient data': return 'bg-bg-panel text-text-muted';
+    default:          return 'bg-accent-info/10 text-accent-info';
+  }
+};
+
+/** Infer a human-readable section label from the pillar names present. */
+const pillarSectionLabel = (pillarNames: string[]): string => {
+  if (!pillarNames.length) return 'Research pillars';
+  const fundSignals   = ['Fund Performance', 'Manager Quality', 'Risk-Adjusted Returns'];
+  const etfSignals    = ['Performance & Tracking', 'Liquidity & Trading', 'Index & Strategy Quality'];
+  const reitSignals   = ['Distribution Sustainability', 'Portfolio Quality', 'Balance Sheet & Leverage'];
+  const bondSignals   = ['Credit Quality', 'Yield & Spread', 'Interest Rate Sensitivity'];
+  const earlySignals  = ['Path to Profitability', 'Technology & Product', 'Valuation & Dilution Risk'];
+  if (fundSignals.some(s => pillarNames.includes(s)))   return 'Fund analysis';
+  if (etfSignals.some(s => pillarNames.includes(s)))    return 'ETF analysis';
+  if (reitSignals.some(s => pillarNames.includes(s)))   return 'REIT analysis';
+  if (bondSignals.some(s => pillarNames.includes(s)))   return 'Credit analysis';
+  if (earlySignals.some(s => pillarNames.includes(s)))  return 'Early-stage analysis';
+  return 'Six pillars';
+};
+
+/** Return appropriate snapshot row labels for the asset class. */
+const snapshotLabels = (pillarNames: string[]): { valuation: string; technical: string } => {
+  if (['Fund Performance', 'Manager Quality'].some(s => pillarNames.includes(s)))
+    return { valuation: 'Return quality', technical: 'Performance trend' };
+  if (['Performance & Tracking', 'Liquidity & Trading'].some(s => pillarNames.includes(s)))
+    return { valuation: 'Cost efficiency', technical: 'Tracking quality' };
+  if (['Distribution Sustainability'].some(s => pillarNames.includes(s)))
+    return { valuation: 'NAV premium/discount', technical: 'Distribution trend' };
+  if (['Credit Quality', 'Yield & Spread'].some(s => pillarNames.includes(s)))
+    return { valuation: 'Spread level', technical: 'Credit trend' };
+  return { valuation: 'Valuation', technical: 'Technical backdrop' };
+};
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
 export const AnalysisDashboard: React.FC<Props> = ({ data, onAskAdvisor }) => {
   if (data.finalSynthesis) {
     return <SynthesisFirstDashboard data={data} synthesis={data.finalSynthesis} onAskAdvisor={onAskAdvisor} />;
@@ -13,7 +226,9 @@ export const AnalysisDashboard: React.FC<Props> = ({ data, onAskAdvisor }) => {
   return <LegacyScorecardDashboard data={data} onAskAdvisor={onAskAdvisor} />;
 };
 
-/** Primary experience: investment memo first; technical detail in expanders only. */
+// ---------------------------------------------------------------------------
+// Primary view — synthesis-first investment memo
+// ---------------------------------------------------------------------------
 const SynthesisFirstDashboard: React.FC<{
   data: ResearchRunData;
   synthesis: NonNullable<ResearchRunData['finalSynthesis']>;
@@ -21,15 +236,22 @@ const SynthesisFirstDashboard: React.FC<{
 }> = ({ data, synthesis, onAskAdvisor }) => {
   const { summary, scorecard, generatedAt } = data;
   const pillarAssessments = data.pillarAssessments ?? {};
-  const evidenceByPillar = data.evidenceByPillar ?? {};
-  const sourcesByPillar = data.sourcesByPillar ?? {};
+  const evidenceByPillar  = data.evidenceByPillar  ?? {};
+  const sourcesByPillar   = data.sourcesByPillar   ?? {};
+
   const orderedTakeaways = [...synthesis.pillarTakeaways].sort((a, b) => b.score - a.score);
   const weakestName = orderedTakeaways.length ? orderedTakeaways[orderedTakeaways.length - 1].pillarName : '';
   const recommendation = synthesis.personalizedRecommendation;
 
+  const pillarNames = orderedTakeaways.map(t => t.pillarName);
+  const sectionLabel = pillarSectionLabel(pillarNames);
+  const { valuation: valLabel, technical: techLabel } = snapshotLabels(pillarNames);
+
   return (
     <div className="h-full overflow-y-auto custom-scrollbar">
       <div className="mx-auto flex w-full max-w-[1100px] flex-col px-6 pb-20 pt-10 md:px-10 md:pt-14">
+
+        {/* ── Header ── */}
         <header className="border-b border-line-subtle pb-10">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-[760px]">
@@ -41,11 +263,10 @@ const SynthesisFirstDashboard: React.FC<{
                 {summary.ticker}
               </p>
             </div>
-
             <div className="grid grid-cols-2 gap-6 text-right md:grid-cols-3">
               <HeaderMetric label="Recommendation" value={scorecard.recommendation} highlight />
-              <HeaderMetric label="Overall score" value={`${scorecard.overall_score}/100`} />
-              <HeaderMetric label="Generated" value={new Date(generatedAt).toLocaleDateString()} />
+              <HeaderMetric label="Overall score"  value={`${scorecard.overall_score}/100`} />
+              <HeaderMetric label="Generated"      value={new Date(generatedAt).toLocaleDateString()} />
             </div>
           </div>
           {onAskAdvisor ? (
@@ -58,31 +279,35 @@ const SynthesisFirstDashboard: React.FC<{
           ) : null}
         </header>
 
+        {/* ── Company snapshot ── */}
         <section className="border-b border-line-subtle py-10">
           <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Company snapshot</p>
-          <p className="mt-5 max-w-[820px] text-[18px] leading-9 text-text-primary">{synthesis.companySnapshot}</p>
+          <Markdown text={synthesis.companySnapshot} className="mt-5 max-w-[820px] text-[17px] leading-9 text-text-primary [&>p]:text-[17px] [&>p]:leading-9" />
         </section>
 
         <ResearchDisclaimer />
 
-        <section className="grid grid-cols-1 gap-10 border-b border-line-subtle py-10 lg:grid-cols-[minmax(0,1.2fr)_320px]">
+        {/* ── Investment takeaway + snapshot metrics ── */}
+        <section className="grid grid-cols-1 gap-10 border-b border-line-subtle py-10 lg:grid-cols-[minmax(0,1.2fr)_300px]">
           <div>
             <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Investment takeaway</p>
-            <p className="mt-5 max-w-[760px] text-[20px] leading-10 text-text-primary">{synthesis.investmentTakeaway}</p>
+            <Markdown text={synthesis.investmentTakeaway} className="mt-5 max-w-[760px] [&>p]:text-[19px] [&>p]:leading-10" />
             {recommendation ? (
-              <p className="mt-5 max-w-[760px] text-[16px] leading-8 text-text-secondary">
-                {recommendation.finalRecommendation.explanation}
-              </p>
+              <Markdown
+                text={recommendation.finalRecommendation.explanation}
+                className="mt-5 max-w-[760px] [&>p]:text-[15px] [&>p]:leading-8 [&>p]:text-text-secondary"
+              />
             ) : null}
           </div>
-          <div className="space-y-6">
-            <SnapshotRow label="Confidence" value={`${Math.round(scorecard.confidence * 100)}%`} />
-            <SnapshotRow label="Valuation" value={scorecard.valuation_status || 'Unknown'} />
-            <SnapshotRow label="Technical backdrop" value={scorecard.technical_state || 'Unknown'} />
+          <div className="space-y-5">
+            <SnapshotRow label="Confidence"               value={`${Math.round(scorecard.confidence * 100)}%`} />
+            <SnapshotRow label={valLabel}                 value={scorecard.valuation_status || 'Unknown'} />
+            <SnapshotRow label={techLabel}                value={scorecard.technical_state  || 'Unknown'} />
             <SnapshotRow label="Recommendation confidence" value={scorecard.recommendation_confidence || '—'} />
           </div>
         </section>
 
+        {/* ── Quality / fit / action blocks ── */}
         {recommendation ? (
           <section className="grid grid-cols-1 gap-8 border-b border-line-subtle py-10 lg:grid-cols-3">
             <RecommendationBlock
@@ -106,77 +331,99 @@ const SynthesisFirstDashboard: React.FC<{
           </section>
         ) : null}
 
+        {/* ── Why / risks ── */}
         <section className="grid grid-cols-1 gap-10 border-b border-line-subtle py-10 lg:grid-cols-2">
-          <MemoColumn title="Why this rating" items={synthesis.recommendationRationale} />
+          <MemoColumn title="Why this rating"    items={synthesis.recommendationRationale} />
           <MemoColumn title="What could go wrong" items={synthesis.mainRisks} />
         </section>
 
+        {/* ── Pillars ── */}
         <section className="border-b border-line-subtle py-10">
           <div className="max-w-[720px]">
-            <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Six pillars</p>
-            <p className="mt-4 text-[16px] leading-8 text-text-secondary">
+            <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">{sectionLabel}</p>
+            <p className="mt-4 text-[15px] leading-8 text-text-secondary">
               Plain-language summaries first. Open a section for metrics, evidence excerpts, and sources.
             </p>
           </div>
 
-          <div className="mt-8 space-y-6">
+          <div className="mt-8 space-y-px">
             {orderedTakeaways.map((takeaway, index) => (
               <PillarSynthesisDetails
                 key={takeaway.pillarName}
                 takeaway={takeaway}
                 assessment={pillarAssessments[takeaway.pillarName]}
-                evidence={evidenceByPillar[takeaway.pillarName] ?? []}
-                sources={sourcesByPillar[takeaway.pillarName] ?? []}
+                evidence={evidenceByPillar[takeaway.pillarName]  ?? []}
+                sources={sourcesByPillar[takeaway.pillarName]    ?? []}
                 defaultOpen={index < 2 || takeaway.pillarName === weakestName}
               />
             ))}
           </div>
         </section>
 
+        {/* ── Bottom line ── */}
         <section className="border-b border-line-subtle py-10">
           <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Bottom line</p>
-          <p className="mt-5 max-w-[760px] text-[17px] leading-9 text-text-primary">{synthesis.bottomLine}</p>
+          <Markdown text={synthesis.bottomLine} className="mt-5 max-w-[760px] [&>p]:text-[17px] [&>p]:leading-9" />
         </section>
 
         <ArtifactsSection artifacts={data.artifacts ?? []} />
 
         <section className="py-10">
-          <p className="max-w-[760px] text-[14px] leading-7 text-text-muted">{synthesis.sourceNote}</p>
+          <p className="max-w-[760px] text-[13px] leading-7 text-text-muted">{synthesis.sourceNote}</p>
         </section>
+
       </div>
     </div>
   );
 };
 
+// ---------------------------------------------------------------------------
+// Pillar expandable section
+// ---------------------------------------------------------------------------
 const PillarSynthesisDetails: React.FC<{
   takeaway: PillarTakeaway;
   assessment?: ResearchRunData['pillarAssessments'][string];
-  evidence: ResearchRunData['evidenceByPillar'][string];
+  evidence: EvidenceFact[];
   sources: ResearchRunData['sourcesByPillar'][string];
   defaultOpen: boolean;
 }> = ({ takeaway, assessment, evidence, sources, defaultOpen }) => {
   const category = assessment?.category ?? '';
+  const score    = takeaway.score ?? assessment?.score ?? 0;
+
   return (
-    <details className="border-t border-line-subtle pt-6" open={defaultOpen}>
+    <details className="border-t border-line-subtle pt-6 pb-2" open={defaultOpen}>
       <summary className="cursor-pointer list-none">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_140px]">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_160px]">
           <div>
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-[26px] leading-none tracking-[-0.03em] text-text-primary">{takeaway.pillarName}</h2>
+              <h2 className="text-[24px] leading-none tracking-[-0.03em] text-text-primary">
+                {takeaway.pillarName}
+              </h2>
               {category ? (
-                <span className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${categoryTone(category)}`}>
+                <span className={`rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${categoryBg(category)}`}>
                   {category}
                 </span>
               ) : null}
-              <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">{takeaway.position}</span>
+              {takeaway.position ? (
+                <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-text-muted">
+                  {takeaway.position}
+                </span>
+              ) : null}
             </div>
-            <p className="mt-4 max-w-[760px] text-[16px] leading-8 text-text-secondary">{takeaway.plainEnglishSummary}</p>
-            <p className="mt-3 max-w-[760px] text-[15px] leading-8 text-text-muted">{takeaway.whyItMatters}</p>
+            <p className="mt-4 max-w-[760px] text-[15px] leading-8 text-text-secondary">
+              {takeaway.plainEnglishSummary}
+            </p>
+            {takeaway.whyItMatters ? (
+              <p className="mt-2 max-w-[760px] text-[14px] leading-7 text-text-muted">
+                {takeaway.whyItMatters}
+              </p>
+            ) : null}
           </div>
           <div className="md:text-right">
-            <p className="font-mono text-[18px] text-text-primary">{takeaway.score}/100</p>
+            <p className="font-mono text-[20px] text-text-primary">{score}/100</p>
+            <ScoreBar score={score} />
             {assessment != null ? (
-              <p className="mt-1 text-[12px] uppercase tracking-[0.14em] text-text-muted">
+              <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-text-muted">
                 model confidence {Math.round(assessment.confidence * 100)}%
               </p>
             ) : null}
@@ -184,20 +431,81 @@ const PillarSynthesisDetails: React.FC<{
         </div>
       </summary>
 
-      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.15fr)_320px]">
-        <div className="space-y-6">
-          <MemoList label="Supporting points" items={takeaway.supportingPoints} emptyText="None listed." />
-          <MemoList label="Watch items" items={takeaway.watchItems} emptyText="None listed." />
-          {takeaway.technicalDetails ? (
-            <MemoDetail label="Technical detail" text={takeaway.technicalDetails} />
+      <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.15fr)_300px]">
+        <div className="space-y-7">
+
+          {/* Supporting points */}
+          {takeaway.supportingPoints?.length ? (
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Supporting points</p>
+              <ul className="mt-3 space-y-2">
+                {takeaway.supportingPoints.map((pt, i) => (
+                  <li key={i} className="flex gap-2 text-[14px] leading-7 text-text-secondary">
+                    <span className="mt-[0.5em] h-[5px] w-[5px] flex-shrink-0 rounded-full bg-accent-positive" />
+                    <Markdown text={pt} />
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : null}
-          <MemoList
-            label="Evidence excerpts"
-            items={evidence.slice(0, 5).map(formatEvidence)}
-            emptyText="No structured evidence for this pillar in this run."
-          />
-          <MemoList label="Gaps" items={assessment?.gaps ?? []} emptyText="No major gaps flagged." />
+
+          {/* Watch items */}
+          {takeaway.watchItems?.length ? (
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Watch items</p>
+              <ul className="mt-3 space-y-2">
+                {takeaway.watchItems.map((pt, i) => (
+                  <li key={i} className="flex gap-2 text-[14px] leading-7 text-text-secondary">
+                    <span className="mt-[0.5em] h-[5px] w-[5px] flex-shrink-0 rounded-full bg-accent-warning" />
+                    <Markdown text={pt} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {/* Technical detail */}
+          {takeaway.technicalDetails ? (
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Technical detail</p>
+              <Markdown text={takeaway.technicalDetails} className="mt-3" />
+            </div>
+          ) : null}
+
+          {/* Evidence cards */}
+          {evidence.length ? (
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Evidence excerpts</p>
+              <div className="mt-3 space-y-2">
+                {evidence.slice(0, 5).map((fact, i) => (
+                  <EvidenceCard key={i} fact={fact} />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Evidence excerpts</p>
+              <p className="mt-3 text-[14px] text-text-muted">No structured evidence for this pillar in this run.</p>
+            </div>
+          )}
+
+          {/* Gaps */}
+          {assessment?.gaps?.length ? (
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Gaps</p>
+              <ul className="mt-3 space-y-2">
+                {assessment.gaps.map((g, i) => (
+                  <li key={i} className="text-[13px] leading-7 text-text-muted">{g}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="text-[13px] text-text-muted">No major gaps flagged.</p>
+          )}
+
         </div>
+
+        {/* Sidebar */}
         <aside className="space-y-6">
           <SourceCard source={sources[0]} />
           {sources.length > 1 ? (
@@ -205,39 +513,48 @@ const PillarSynthesisDetails: React.FC<{
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">More sources</p>
               <div className="mt-3 space-y-3">
                 {sources.slice(1, 4).map((s) => (
-                  <a
-                    key={s.link}
-                    href={s.link}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block text-[14px] font-semibold text-text-primary transition hover:opacity-80"
-                  >
+                  <a key={s.link} href={s.link} target="_blank" rel="noreferrer"
+                    className="block text-[13px] font-semibold text-text-primary transition hover:opacity-70">
                     {s.title || 'Source'}
                   </a>
                 ))}
               </div>
             </div>
           ) : null}
-          {assessment != null ? <MetaBlock label="Evidence count" value={`${assessment.evidence_count}`} /> : null}
+          {assessment != null ? (
+            <MetaBlock label="Evidence count" value={`${assessment.evidence_count}`} />
+          ) : null}
         </aside>
       </div>
     </details>
   );
 };
 
-/** Compatibility: older runs without finalSynthesis. */
-const LegacyScorecardDashboard: React.FC<{ data: ResearchRunData; onAskAdvisor?: (query: string) => void }> = ({ data, onAskAdvisor }) => {
+// ---------------------------------------------------------------------------
+// Legacy scorecard view (runs without finalSynthesis)
+// ---------------------------------------------------------------------------
+const LegacyScorecardDashboard: React.FC<{
+  data: ResearchRunData;
+  onAskAdvisor?: (query: string) => void;
+}> = ({ data, onAskAdvisor }) => {
   const { summary, scorecard, generatedAt } = data;
   const pillarAssessments = data.pillarAssessments ?? {};
-  const evidenceByPillar = data.evidenceByPillar ?? {};
-  const sourcesByPillar = data.sourcesByPillar ?? {};
-  const orderedPillars = Object.entries(pillarAssessments).sort((a, b) => b[1].score - a[1].score);
+  const evidenceByPillar  = data.evidenceByPillar  ?? {};
+  const sourcesByPillar   = data.sourcesByPillar   ?? {};
+  const orderedPillars = (Object.entries(pillarAssessments) as [string, typeof pillarAssessments[string]][])
+    .sort((a, b) => a[1].score - b[1].score)
+    .reverse();
   const strongest = orderedPillars[0];
-  const weakest = orderedPillars[orderedPillars.length - 1];
+  const weakest   = orderedPillars[orderedPillars.length - 1];
+
+  const pillarNames = orderedPillars.map(([p]) => p);
+  const sectionLabel = pillarSectionLabel(pillarNames);
+  const { valuation: valLabel, technical: techLabel } = snapshotLabels(pillarNames);
 
   return (
     <div className="h-full overflow-y-auto custom-scrollbar">
       <div className="mx-auto flex w-full max-w-[1100px] flex-col px-6 pb-20 pt-10 md:px-10 md:pt-14">
+
         <header className="border-b border-line-subtle pb-10">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-[760px]">
@@ -249,11 +566,10 @@ const LegacyScorecardDashboard: React.FC<{ data: ResearchRunData; onAskAdvisor?:
                 {summary.ticker}
               </p>
             </div>
-
             <div className="grid grid-cols-2 gap-6 text-right md:grid-cols-3">
               <HeaderMetric label="Recommendation" value={scorecard.recommendation} highlight />
-              <HeaderMetric label="Overall Score" value={`${scorecard.overall_score}/100`} />
-              <HeaderMetric label="Generated" value={new Date(generatedAt).toLocaleDateString()} />
+              <HeaderMetric label="Overall Score"  value={`${scorecard.overall_score}/100`} />
+              <HeaderMetric label="Generated"      value={new Date(generatedAt).toLocaleDateString()} />
             </div>
           </div>
           {onAskAdvisor ? (
@@ -265,78 +581,95 @@ const LegacyScorecardDashboard: React.FC<{ data: ResearchRunData; onAskAdvisor?:
             </button>
           ) : null}
         </header>
+
         <ResearchDisclaimer />
 
-        <section className="grid grid-cols-1 gap-10 border-b border-line-subtle py-10 lg:grid-cols-[minmax(0,1.2fr)_320px]">
+        <section className="grid grid-cols-1 gap-10 border-b border-line-subtle py-10 lg:grid-cols-[minmax(0,1.2fr)_300px]">
           <div>
             <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Executive Summary</p>
-            <p className="mt-5 max-w-[760px] text-[20px] leading-10 text-text-primary">
-              {scorecard.reasoning}
-            </p>
+            <Markdown text={scorecard.reasoning} className="mt-5 max-w-[760px] [&>p]:text-[19px] [&>p]:leading-10" />
           </div>
-
-          <div className="space-y-6">
-            <SnapshotRow label="Confidence" value={`${Math.round(scorecard.confidence * 100)}%`} />
-            <SnapshotRow label="Strongest Pillar" value={strongest ? strongest[0] : '—'} />
-            <SnapshotRow label="Weakest Pillar" value={weakest ? weakest[0] : '—'} />
-            <SnapshotRow label="Valuation" value={scorecard.valuation_status} />
-            <SnapshotRow label="Technical" value={scorecard.technical_state} />
+          <div className="space-y-5">
+            <SnapshotRow label="Confidence"     value={`${Math.round(scorecard.confidence * 100)}%`} />
+            <SnapshotRow label="Strongest pillar" value={strongest ? strongest[0] : '—'} />
+            <SnapshotRow label="Weakest pillar"   value={weakest  ? weakest[0]  : '—'} />
+            <SnapshotRow label={valLabel}          value={scorecard.valuation_status} />
+            <SnapshotRow label={techLabel}         value={scorecard.technical_state} />
           </div>
         </section>
 
         <section className="grid grid-cols-1 gap-10 border-b border-line-subtle py-10 lg:grid-cols-2">
-          <MemoColumn title="Why It Works" items={scorecard.bullish_drivers} />
+          <MemoColumn title="Why It Works"     items={scorecard.bullish_drivers} />
           <MemoColumn title="What Holds It Back" items={scorecard.key_risks} />
         </section>
 
         <section className="border-b border-line-subtle py-10">
           <div className="max-w-[720px]">
-            <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Pillar Analysis</p>
-            <p className="mt-4 text-[16px] leading-8 text-text-secondary">
-              Each pillar combines evidence quality, source credibility, and signal coverage. Expand a section to see the rationale behind the score and the strongest source supporting the view.
+            <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">{sectionLabel}</p>
+            <p className="mt-4 text-[15px] leading-8 text-text-secondary">
+              Each pillar combines evidence quality, source credibility, and signal coverage.
             </p>
           </div>
 
-          <div className="mt-8 space-y-6">
+          <div className="mt-8 space-y-px">
             {orderedPillars.map(([pillar, assessment], index) => {
               const sources = sourcesByPillar[pillar] ?? [];
-              const bestSource = sources[0];
               const evidence = evidenceByPillar[pillar] ?? [];
               return (
-                <details
-                  key={pillar}
-                  className="border-t border-line-subtle pt-6"
-                  open={index < 2 || pillar === weakest?.[0]}
-                >
+                <details key={pillar} className="border-t border-line-subtle pt-6 pb-2"
+                  open={index < 2 || pillar === weakest?.[0]}>
                   <summary className="cursor-pointer list-none">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_140px]">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_160px]">
                       <div>
                         <div className="flex flex-wrap items-center gap-3">
-                          <h2 className="text-[26px] leading-none tracking-[-0.03em] text-text-primary">{pillar}</h2>
-                          <span className={`px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${categoryTone(assessment.category)}`}>
+                          <h2 className="text-[24px] leading-none tracking-[-0.03em] text-text-primary">{pillar}</h2>
+                          <span className={`rounded px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${categoryBg(assessment.category)}`}>
                             {assessment.category}
                           </span>
                         </div>
-                        <p className="mt-4 max-w-[760px] text-[16px] leading-8 text-text-secondary">{assessment.synopsis}</p>
+                        <p className="mt-4 max-w-[760px] text-[15px] leading-8 text-text-secondary">
+                          {assessment.synopsis}
+                        </p>
                       </div>
                       <div className="md:text-right">
-                        <p className="font-mono text-[18px] text-text-primary">{assessment.score}/100</p>
-                        <p className="mt-1 text-[12px] uppercase tracking-[0.14em] text-text-muted">
+                        <p className="font-mono text-[20px] text-text-primary">{assessment.score}/100</p>
+                        <ScoreBar score={assessment.score} />
+                        <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-text-muted">
                           confidence {Math.round(assessment.confidence * 100)}%
                         </p>
                       </div>
                     </div>
                   </summary>
 
-                  <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.15fr)_320px]">
+                  <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.15fr)_300px]">
                     <div className="space-y-6">
-                      <MemoDetail label="Why This Score" text={assessment.analysis || buildPillarNarrative(assessment)} />
-                      <MemoList label="Key Evidence" items={evidence.slice(0, 3).map(formatEvidence)} emptyText="No structured evidence extracted for this pillar." />
-                      <MemoList label="Open Gaps" items={assessment.gaps} emptyText="No major gaps surfaced." />
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Analysis</p>
+                        <Markdown text={assessment.analysis || assessment.synopsis} className="mt-3" />
+                      </div>
+                      {evidence.length ? (
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Key Evidence</p>
+                          <div className="mt-3 space-y-2">
+                            {evidence.slice(0, 3).map((fact, i) => (
+                              <EvidenceCard key={i} fact={fact} />
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      {assessment.gaps?.length ? (
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Open gaps</p>
+                          <ul className="mt-3 space-y-1">
+                            {assessment.gaps.map((g, i) => (
+                              <li key={i} className="text-[13px] leading-7 text-text-muted">{g}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
                     </div>
-
                     <aside className="space-y-6">
-                      <SourceCard source={bestSource} />
+                      <SourceCard source={sources[0]} />
                       <MetaBlock label="Evidence Count" value={`${assessment.evidence_count}`} />
                     </aside>
                   </div>
@@ -346,25 +679,10 @@ const LegacyScorecardDashboard: React.FC<{ data: ResearchRunData; onAskAdvisor?:
           </div>
         </section>
 
-        <section className="border-b border-line-subtle py-10">
-          <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">Source Library</p>
-          <div className="mt-6 divide-y divide-line-subtle">
-            {Object.entries(sourcesByPillar).map(([pillar, sources]) => (
-              <div key={pillar} className="grid grid-cols-1 gap-4 py-5 md:grid-cols-[220px_minmax(0,1fr)]">
-                <p className="text-[15px] font-semibold text-text-primary">{pillar}</p>
-                <div className="space-y-4">
-                  {renderSourceGroup('Primary sources', sources.filter((item) => item.is_primary_source).slice(0, 2))}
-                  {renderSourceGroup('Supporting sources', sources.filter((item) => !item.is_primary_source).slice(0, 2))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
         {orderedPillars.length === 0 && (
           <section className="py-10">
             <p className="text-[15px] leading-7 text-text-muted">
-              The run completed, but no pillar-level synthesis was returned. The saved result may be incomplete.
+              The run completed, but no pillar-level synthesis was returned.
             </p>
           </section>
         )}
@@ -375,6 +693,9 @@ const LegacyScorecardDashboard: React.FC<{ data: ResearchRunData; onAskAdvisor?:
   );
 };
 
+// ---------------------------------------------------------------------------
+// Shared sub-components
+// ---------------------------------------------------------------------------
 const ResearchDisclaimer = () => (
   <section className="border-b border-line-subtle py-6">
     <p className="max-w-[860px] text-[13px] leading-6 text-text-secondary">
@@ -392,22 +713,16 @@ const HeaderMetric = ({ label, value, highlight = false }: { label: string; valu
 );
 
 const SnapshotRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="border-b border-line-subtle pb-3">
+  <div className="border-b border-line-subtle pb-4">
     <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">{label}</p>
     <p className="mt-2 text-[15px] text-text-primary">{value}</p>
   </div>
 );
 
 const RecommendationBlock = ({
-  title,
-  score,
-  label,
-  detail,
+  title, score, label, detail,
 }: {
-  title: string;
-  score: number | null;
-  label: string;
-  detail: string;
+  title: string; score: number | null; label: string; detail: string;
 }) => (
   <div className="border-t border-line-subtle pt-5">
     <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">{title}</p>
@@ -415,54 +730,24 @@ const RecommendationBlock = ({
       {score != null ? <p className="font-mono text-[22px] text-text-primary">{score}/100</p> : null}
       <p className="text-[17px] font-semibold text-text-primary">{label}</p>
     </div>
-    <p className="mt-3 text-[14px] leading-7 text-text-secondary">{detail}</p>
+    {score != null ? <ScoreBar score={score} /> : null}
+    <p className="mt-3 text-[13px] leading-7 text-text-secondary">{detail}</p>
   </div>
 );
 
 const MemoColumn = ({ title, items }: { title: string; items: string[] }) => (
   <div>
     <p className="text-[12px] uppercase tracking-[0.18em] text-text-muted">{title}</p>
-    <div className="mt-5 space-y-4">
+    <div className="mt-5 space-y-3">
       {items.length ? (
-        items.map((item) => (
-          <p key={item} className="text-[16px] leading-8 text-text-secondary">
-            {item}
-          </p>
+        items.map((item, i) => (
+          <div key={i} className="flex gap-3">
+            <span className="mt-[0.6em] h-[5px] w-[5px] flex-shrink-0 rounded-full bg-text-muted" />
+            <Markdown text={item} className="[&>p]:text-[15px] [&>p]:leading-8 [&>p]:text-text-secondary" />
+          </div>
         ))
       ) : (
-        <p className="text-[15px] leading-7 text-text-muted">No clear evidence surfaced.</p>
-      )}
-    </div>
-  </div>
-);
-
-const MemoDetail = ({ label, text }: { label: string; text: string }) => (
-  <div>
-    <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">{label}</p>
-    <p className="mt-3 text-[15px] leading-8 text-text-secondary">{text}</p>
-  </div>
-);
-
-const MemoList = ({
-  label,
-  items,
-  emptyText,
-}: {
-  label: string;
-  items: string[];
-  emptyText: string;
-}) => (
-  <div>
-    <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">{label}</p>
-    <div className="mt-3 space-y-3">
-      {items.length ? (
-        items.map((item) => (
-          <p key={item} className="text-[15px] leading-8 text-text-secondary">
-            {item}
-          </p>
-        ))
-      ) : (
-        <p className="text-[15px] leading-7 text-text-muted">{emptyText}</p>
+        <p className="text-[14px] leading-7 text-text-muted">No clear evidence surfaced.</p>
       )}
     </div>
   </div>
@@ -472,13 +757,11 @@ const SourceCard = ({ source }: { source?: ResearchRunData['sourcesByPillar'][st
   <div className="border-t border-line-subtle pt-4">
     <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Best Source</p>
     {source?.link ? (
-      <a href={source.link} target="_blank" rel="noreferrer" className="mt-3 block transition hover:opacity-80">
+      <a href={source.link} target="_blank" rel="noreferrer" className="mt-3 block transition hover:opacity-75">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[16px] font-semibold text-text-primary">{source.title || 'Untitled source'}</p>
+          <p className="text-[14px] font-semibold text-text-primary">{source.title || 'Untitled source'}</p>
           {source.is_primary_source && (
-            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-positive">
-              Primary source
-            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-positive">Primary</span>
           )}
           {source.source_kind && (
             <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
@@ -486,46 +769,15 @@ const SourceCard = ({ source }: { source?: ResearchRunData['sourcesByPillar'][st
             </span>
           )}
         </div>
-        <p className="mt-2 text-[14px] leading-7 text-text-secondary">
-          {(source.judge_summary || source.snippet || source.body || '').slice(0, 180)}
+        <p className="mt-2 text-[13px] leading-6 text-text-secondary">
+          {(source.judge_summary || source.snippet || source.body || '').slice(0, 160)}
         </p>
       </a>
     ) : (
-      <p className="mt-3 text-[14px] leading-7 text-text-muted">No standout source was surfaced for this pillar.</p>
+      <p className="mt-3 text-[13px] leading-7 text-text-muted">No standout source surfaced for this pillar.</p>
     )}
   </div>
 );
-
-const renderSourceGroup = (label: string, sources: ResearchRunData['sourcesByPillar'][string]) => {
-  if (!sources.length) return null;
-  return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">{label}</p>
-      <div className="mt-3 space-y-4">
-        {sources.map((source) => (
-          <a key={`${label}-${source.link}`} href={source.link} target="_blank" rel="noreferrer" className="block transition hover:opacity-80">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[15px] font-semibold text-text-primary">{source.title || 'Untitled source'}</p>
-              {source.is_primary_source && (
-                <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent-positive">
-                  Primary source
-                </span>
-              )}
-              {source.document_type && (
-                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-text-muted">
-                  {source.document_type}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-[14px] leading-7 text-text-secondary">
-              {(source.judge_summary || source.snippet || source.body || '').slice(0, 180)}
-            </p>
-          </a>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 const MetaBlock = ({ label, value }: { label: string; value: string }) => (
   <div className="border-t border-line-subtle pt-4">
@@ -542,11 +794,11 @@ const ArtifactsSection = ({ artifacts }: { artifacts: NonNullable<ResearchRunDat
       <div className="mt-6 divide-y divide-line-subtle">
         {artifacts.slice(0, 12).map((artifact) => (
           <div key={artifact.id} className="grid grid-cols-1 gap-3 py-4 md:grid-cols-[220px_minmax(0,1fr)_120px]">
-            <p className="text-[14px] font-semibold uppercase tracking-[0.12em] text-text-primary">
+            <p className="text-[13px] font-semibold uppercase tracking-[0.12em] text-text-primary">
               {artifact.artifact_type.replace(/_/g, ' ')}
             </p>
-            <p className="break-all font-mono text-[12px] leading-6 text-text-secondary">{artifact.storage_uri}</p>
-            <p className="font-mono text-[12px] uppercase tracking-[0.12em] text-text-muted md:text-right">
+            <p className="break-all font-mono text-[11px] leading-6 text-text-secondary">{artifact.storage_uri}</p>
+            <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted md:text-right">
               {formatBytes(artifact.size_bytes)}
             </p>
           </div>
@@ -557,35 +809,8 @@ const ArtifactsSection = ({ artifacts }: { artifacts: NonNullable<ResearchRunDat
 };
 
 const formatBytes = (value: number) => {
-  if (!value) return '0 B';
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  if (!value)                 return '0 B';
+  if (value < 1024)           return `${value} B`;
+  if (value < 1024 * 1024)    return `${(value / 1024).toFixed(1)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-const buildPillarNarrative = (assessment: ResearchRunData['pillarAssessments'][string]) => {
-  const support = assessment.strengths[0] ?? 'No strong signal was confirmed';
-  const gap = assessment.gaps[0] ?? 'No major gap surfaced';
-  return `This pillar is currently classified as ${assessment.category.toLowerCase()} with a score of ${assessment.score}/100. The strongest confirmed support came from ${support.toLowerCase()}. The main limitation in the current research set is ${gap.toLowerCase()}, which constrains confidence in a stronger view.`;
-};
-
-const formatEvidence = (fact: ResearchRunData['evidenceByPillar'][string][number]) => {
-  const metric = fact.metric_name && fact.metric_value ? `${fact.metric_name}: ${fact.metric_value}` : fact.signal_name;
-  const period = fact.period ? ` (${fact.period})` : '';
-  return `${metric}${period}. ${fact.excerpt}`.trim();
-};
-
-const categoryTone = (category: string) => {
-  switch (category.toLowerCase()) {
-    case 'bullish':
-      return 'text-accent-positive';
-    case 'cautious':
-      return 'text-accent-warning';
-    case 'weak':
-      return 'text-accent-risk';
-    case 'insufficient data':
-      return 'text-text-muted';
-    default:
-      return 'text-accent-info';
-  }
 };

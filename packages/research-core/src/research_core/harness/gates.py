@@ -17,6 +17,12 @@ from research_core.harness.models import QualityGateResult, ResearchPlan, Resear
 
 EVIDENCE_JUDGE_MODEL = os.getenv("EVIDENCE_JUDGE_MODEL", "gpt-4o-mini")
 
+# Per-fact LLM judgement makes one OpenAI call per evidence fact (300+ per run).
+# This is the single biggest latency driver. Disabled by default — the
+# deterministic alignment scorer is good enough for production quality gates.
+# Set EVIDENCE_JUDGE_ENABLED=true only in offline evaluation / dev mode.
+_EVIDENCE_JUDGE_ENABLED = os.getenv("EVIDENCE_JUDGE_ENABLED", "false").strip().lower() == "true"
+
 EVIDENCE_JUDGE_SYSTEM = """You judge whether an evidence fact can support an investment research pillar.
 
 Check company/entity match, pillar relevance, signal relevance, source quality, stale/weak evidence, and unrelated filings.
@@ -275,6 +281,9 @@ class ResearchQualityGates:
             "goal_term_matches": goal_overlap[:5],
             "requirement_term_matches": requirement_overlap[:5],
         }
+        if not _EVIDENCE_JUDGE_ENABLED:
+            deterministic["judge_source"] = "deterministic"
+            return deterministic
         return self._apply_llm_alignment_judgement(
             pillar=pillar,
             fact=fact,

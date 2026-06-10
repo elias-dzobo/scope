@@ -24,6 +24,11 @@ DEFAULT_COMPANY_PILLARS: tuple[str, ...] = (
     "Technical Analysis",
 )
 
+# Kept for backward-compat imports; canonical pillar sets live in asset_class.py
+DEFAULT_PILLARS_BY_MODE: dict[str, tuple[str, ...]] = {
+    "equity_stock": DEFAULT_COMPANY_PILLARS,
+}
+
 
 def utc_now_iso() -> str:
     """Return an ISO timestamp for persisted harness events."""
@@ -68,6 +73,13 @@ class ResearchEntity(BaseModel):
     type: Literal["company", "ticker", "industry", "portfolio", "market", "other"] = "company"
     name: str = Field(min_length=1, description="Human-readable entity name.")
     ticker: str = Field(default="", description="Ticker symbol when the entity is a listed company.")
+    asset_class: str = Field(
+        default="",
+        description=(
+            "Detected or caller-supplied asset class (e.g. 'equity_stock', 'fund', 'etf', "
+            "'reit', 'pre_revenue_equity', 'fixed_income'). Empty string means auto-detect."
+        ),
+    )
     metadata: dict[str, Any] = Field(
         default_factory=dict,
         description="Optional identifiers such as exchange, country, sector, or source ids.",

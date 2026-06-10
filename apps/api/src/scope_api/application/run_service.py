@@ -7,6 +7,7 @@ It is intentionally transport-agnostic and does not import FastAPI.
 from __future__ import annotations
 
 import os
+import threading
 from dataclasses import dataclass
 from typing import Any
 
@@ -25,6 +26,7 @@ from research_core.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Equity stock pillars (default / fallback)
 ALL_PILLARS = [
     "Macro & Industry",
     "Economic Moat",
@@ -33,6 +35,29 @@ ALL_PILLARS = [
     "Valuation",
     "Technical Analysis",
 ]
+
+# All valid pillar names across every asset class.
+# Used by the schema validator so the API accepts fund/ETF/REIT pillars too.
+ALL_VALID_PILLARS: set[str] = {
+    # Equity stock
+    "Macro & Industry", "Economic Moat", "Financial Engine",
+    "Management & Capital Allocation", "Valuation", "Technical Analysis",
+    # Fund
+    "Fund Performance", "Manager Quality", "Portfolio Construction",
+    "Fee Structure", "Risk-Adjusted Returns", "Investor Fit",
+    # ETF
+    "Index & Strategy Quality", "Performance & Tracking", "Holdings & Exposure",
+    "Liquidity & Trading", "Provider Quality",
+    # REIT
+    "Portfolio Quality", "Distribution Sustainability", "Balance Sheet & Leverage",
+    "Management & Operations", "Macro & Real Estate Market",
+    # Pre-revenue equity
+    "Technology & Product", "Path to Profitability", "Management & Team",
+    "Valuation & Dilution Risk", "Competitive Positioning",
+    # Fixed income
+    "Credit Quality", "Interest Rate Sensitivity", "Issuer Financial Health",
+    "Covenant Analysis", "Yield & Spread", "Liquidity",
+}
 
 DEFAULT_DURABLE_ARTIFACT_TYPES = {
     "final_synthesis",
@@ -238,7 +263,9 @@ class ResearchRunService:
 
         Returns run_id immediately. Raises `ResearchRunRejectedError` when queue is full.
         """
-        normalized_pillars = [p.strip() for p in (selected_pillars or ALL_PILLARS)]
+        # Empty / None → let the planner auto-detect the asset class and pick pillars.
+        # Non-empty → use the caller's explicit pillar list as-is.
+        normalized_pillars = [p.strip() for p in selected_pillars] if selected_pillars else []
         self._enforce_research_limits(user_id)
 
         run_id = self._create_run_record(
@@ -415,6 +442,9 @@ class ResearchRunService:
                 started_at=db.utc_now_iso(),
             )
 
+            # Local counter avoids a DB read on every progress callback.
+            _activity_count = [1]
+
             def on_progress(stage: str, payload: dict[str, Any]) -> None:
                 status = payload.get("status", "running")
                 stage_start = STAGE_START_PROGRESS.get(stage, 0.0)
@@ -423,8 +453,7 @@ class ResearchRunService:
                 stage_progress = float(payload.get("stage_progress", 0.0) or 0.0)
                 progress = stage_end if status == "completed" else stage_start + (stage_span * (stage_progress / 100.0))
                 current_substep = str(payload.get("current_substep", "") or "")
-                current = db.get_run(run_id)
-                activity_count = int(current.get("activity_count", 0) or 0) + 1 if current else 1
+                _activity_count[0] += 1
                 db.append_event(run_id, stage, status, payload)
                 db.update_run_state(
                     run_id,
@@ -432,7 +461,7 @@ class ResearchRunService:
                     current_substep=current_substep,
                     progress=max(progress, 1),
                     stage_progress=100 if status == "completed" else stage_progress,
-                    activity_count=activity_count,
+                    activity_count=_activity_count[0],
                     last_activity_at=db.utc_now_iso(),
                 )
 
@@ -442,7 +471,9 @@ class ResearchRunService:
                 summary = self._research_controller.run_company_research(
                     company_name=company_name,
                     ticker=ticker,
-                    selected_pillars=selected_pillars,
+                    # Pass None when no explicit pillars chosen — the planner
+                    # will auto-detect the asset class and select the right set.
+                    selected_pillars=selected_pillars or None,
                     progress_callback=on_progress,
                     user_financial_profile=profile_snapshot.get("financialProfile") if profile_snapshot else None,
                     user_risk_profile=profile_snapshot.get("riskProfile") if profile_snapshot else None,
@@ -497,7 +528,14 @@ class ResearchRunService:
                 last_activity_at=db.utc_now_iso(),
                 completed=True,
             )
-            self._index_user_memory(run_id=run_id, result_payload=result_payload)
+            # Run memory indexing in a daemon thread so it doesn't block the
+            # worker from picking up the next queued job.
+            threading.Thread(
+                target=self._index_user_memory,
+                kwargs={"run_id": run_id, "result_payload": result_payload},
+                daemon=True,
+                name=f"memory-index-{run_id[:8]}",
+            ).start()
             record_orchestrator_completion("partial" if synthesis_failed else "success")
 
     def _register_artifacts(

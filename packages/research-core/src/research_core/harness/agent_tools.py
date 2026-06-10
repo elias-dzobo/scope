@@ -238,6 +238,7 @@ class DocumentDiscoveryTool:
         ctx: ToolContext,
         grounded_results: list[GroundedResearchResult] | None = None,
         max_documents: int = 8,
+        pre_fetched_candidates: list[dict] | None = None,
         **kwargs: Any,
     ) -> ToolResult:
         try:
@@ -246,6 +247,7 @@ class DocumentDiscoveryTool:
                 ctx.ticker,
                 grounded_results=grounded_results or ctx.grounded_results,
                 max_documents=max_documents,
+                pre_fetched_candidates=pre_fetched_candidates,
             )
             primary_count = sum(1 for d in documents if d.is_primary_source)
             quality = min(1.0, 0.3 + (primary_count / 3.0 * 0.7))
@@ -515,8 +517,10 @@ class PillarScoringTool:
         try:
             ev = evidence_by_pillar if evidence_by_pillar is not None else ctx.evidence_by_pillar
             name = company_name or ctx.company_name
-            pillar_assessments = self._facade.assess_pillars(ev)
-            scorecard = self._facade.build_scorecard(name, ctx.ticker, pillar_assessments, ev)
+            # Resolve asset class from the brief so scoring uses the right signals/weights.
+            _ac = ctx.brief.entities[0].asset_class if ctx.brief.entities else ""
+            pillar_assessments = self._facade.assess_pillars(ev, asset_class=_ac or None)
+            scorecard = self._facade.build_scorecard(name, ctx.ticker, pillar_assessments, ev, asset_class=_ac or None)
             overall = scorecard.get("overall_score", 0)
             return ToolResult(
                 tool_name=self.name,

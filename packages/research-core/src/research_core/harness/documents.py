@@ -33,6 +33,12 @@ except Exception:  # pragma: no cover - optional in minimal envs
 CORE_DOCUMENT_PILLARS = {"Financial Engine", "Management & Capital Allocation", "Valuation"}
 DOCUMENT_EXTRACTOR_MODEL = os.getenv("DOCUMENT_EXTRACTOR_MODEL", "gpt-4o-mini")
 
+# Per-(pillar × document) LLM extraction: with 6 pillars × N docs this fires
+# 6N serial OpenAI calls and accounts for ~290s of the ~8min run time.
+# Disabled by default — the deterministic keyword extractor is sufficient.
+# Set DOCUMENT_EXTRACTOR_ENABLED=true only for deep offline extraction passes.
+_DOCUMENT_EXTRACTOR_ENABLED = os.getenv("DOCUMENT_EXTRACTOR_ENABLED", "false").strip().lower() == "true"
+
 DOCUMENT_EXTRACTOR_SYSTEM = """Extract investment research evidence from a parsed company document.
 
 Only extract facts that appear to belong to the requested company and pillar.
@@ -139,7 +145,7 @@ class DocumentParser:
 
     def _extract_evidence_llm(self, pillar: str, document: PrimaryDocument, parsed: ParsedDocument) -> list[dict[str, Any]]:
         """Use an LLM document extractor when configured, with deterministic fallback."""
-        if not os.getenv("OPENAI_API_KEY", "").strip() or not parsed.text.strip():
+        if not _DOCUMENT_EXTRACTOR_ENABLED or not os.getenv("OPENAI_API_KEY", "").strip() or not parsed.text.strip():
             return []
         try:
             model = ChatOpenAI(model=DOCUMENT_EXTRACTOR_MODEL, temperature=0)

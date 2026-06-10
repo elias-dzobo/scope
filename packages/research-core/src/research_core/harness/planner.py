@@ -15,6 +15,14 @@ from typing import Any
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from research_core.harness.asset_class import (
+    AssetClass,
+    detect_asset_class,
+    get_core_pillars,
+    get_evidence_requirements,
+    get_pillars,
+    get_search_focus,
+)
 from research_core.harness.models import (
     DEFAULT_COMPANY_PILLARS,
     EvidenceRequirement,
@@ -28,6 +36,15 @@ from research_core.harness.models import (
 
 
 RESEARCH_PLANNER_MODEL = os.getenv("RESEARCH_PLANNER_MODEL", "gpt-4o-mini")
+
+# Set to "true" to enable the LLM planning call. Defaults to off because
+# the deterministic fallback is already high-quality and the LLM call adds
+# ~3-8 seconds of serial latency before grounded research begins.
+_PLANNER_LLM_ENABLED = os.getenv("RESEARCH_PLANNER_LLM_ENABLED", "false").strip().lower() == "true"
+
+# _CORE_PILLARS is now asset-class-aware via get_core_pillars().
+# Kept as a fallback for any code paths that haven't migrated yet.
+_CORE_PILLARS = {"Financial Engine", "Management & Capital Allocation", "Valuation"}
 
 RESEARCH_PLANNER_SYSTEM = """You are a research planning agent for an investment research harness.
 
@@ -120,24 +137,58 @@ class ResearchPlanner:
         company_name: str,
         ticker: str,
         selected_pillars: list[str] | None = None,
+        asset_class: str | None = None,
+        description: str = "",
     ) -> ResearchBrief:
-        """Build the phase-one brief used for six-pillar company research."""
+        """Build a research brief with asset-class-aware pillar selection.
+
+        Args:
+            company_name:    Human-readable entity name.
+            ticker:          Ticker symbol.
+            selected_pillars: Explicit pillar list; if omitted, derived from
+                             the detected asset class.
+            asset_class:     Explicit asset class string; if omitted,
+                             auto-detected from name / ticker / description.
+            description:     Optional free-text description for richer
+                             asset class detection signals.
+        """
         normalized_ticker = ticker.strip().upper()
-        pillars = [pillar.strip() for pillar in (selected_pillars or DEFAULT_COMPANY_PILLARS)]
+        name = company_name.strip()
+
+        # Detect asset class — explicit value wins, then keyword heuristics.
+        detected = detect_asset_class(
+            name=name,
+            ticker=normalized_ticker,
+            description=description,
+            explicit=asset_class,
+        )
+
+        # Derive pillar set: caller override → asset-class default
+        if selected_pillars:
+            pillars = [p.strip() for p in selected_pillars]
+        else:
+            pillars = list(get_pillars(detected))
+
         return ResearchBrief(
-            objective=f"Research {company_name.strip()} under the six-pillar investment framework.",
+            objective=(
+                f"Research {name} under the "
+                f"{'six-pillar equity' if detected == AssetClass.EQUITY_STOCK else detected.value.replace('_', '-')} "
+                f"investment framework."
+            ),
             mode=ResearchMode.COMPANY_EQUITY_RESEARCH,
             entities=[
                 ResearchEntity(
                     type="company",
-                    name=company_name.strip(),
+                    name=name,
                     ticker=normalized_ticker,
+                    asset_class=detected.value,
                 )
             ],
             selected_pillars=pillars,
             constraints={
-                "framework": "six_pillar_equity_research",
+                "framework": f"{detected.value}_research",
                 "ticker": normalized_ticker,
+                "asset_class": detected.value,
             },
         )
 
@@ -150,7 +201,7 @@ class ResearchPlanner:
     def create_company_plan(self, brief: ResearchBrief) -> ResearchPlan:
         """Create an LLM-led six-pillar company research plan with fallback."""
         fallback = self._create_company_plan_deterministic(brief)
-        if not os.getenv("OPENAI_API_KEY", "").strip():
+        if not _PLANNER_LLM_ENABLED or not os.getenv("OPENAI_API_KEY", "").strip():
             return fallback
         try:
             model = ChatOpenAI(model=RESEARCH_PLANNER_MODEL, temperature=0)
@@ -181,11 +232,22 @@ class ResearchPlanner:
             return fallback
 
     def _create_company_plan_deterministic(self, brief: ResearchBrief) -> ResearchPlan:
-        """Create the deterministic company plan used as validator/fallback."""
-        selected = tuple(brief.selected_pillars or DEFAULT_COMPANY_PILLARS)
-        invalid = [pillar for pillar in selected if pillar not in DEFAULT_COMPANY_PILLARS]
-        if invalid:
-            raise ValueError(f"Unsupported pillars: {', '.join(invalid)}")
+        """Create the deterministic plan for any asset class.
+
+        Pillar set, evidence requirements, and search focus are all derived
+        from the asset class stored on the first ResearchEntity.
+        """
+        # Resolve asset class from the entity (populated in create_company_brief)
+        entity = brief.entities[0] if brief.entities else None
+        raw_ac = (entity.asset_class if entity else "") or brief.constraints.get("asset_class", "")
+        try:
+            ac = AssetClass(raw_ac) if raw_ac else AssetClass.EQUITY_STOCK
+        except ValueError:
+            ac = AssetClass.EQUITY_STOCK
+
+        # Pillar set: brief override → asset-class default
+        selected = tuple(brief.selected_pillars) if brief.selected_pillars else get_pillars(ac)
+        core_pillars = get_core_pillars(ac)
 
         workstreams = [
             ResearchWorkstream(
@@ -193,10 +255,11 @@ class ResearchPlanner:
                 title=pillar,
                 pillar_name=pillar,
                 goal=self._pillar_goal(pillar, brief),
-                required_evidence=PILLAR_EVIDENCE_REQUIREMENTS[pillar],
-                search_focus=PILLAR_SEARCH_FOCUS.get(pillar, []),
-                max_iterations=3,
-                metadata={"planner": "deterministic_fallback"},
+                required_evidence=get_evidence_requirements(ac, pillar),
+                search_focus=get_search_focus(ac, pillar),
+                # Core pillars for this asset class get one retry; others run once.
+                max_iterations=2 if pillar in core_pillars else 1,
+                metadata={"planner": "deterministic_fallback", "asset_class": ac.value},
             )
             for pillar in selected
         ]
@@ -211,18 +274,28 @@ class ResearchPlanner:
                 min_primary_sources_per_core_workstream=1,
                 min_evidence_facts_per_workstream=2,
                 confidence_threshold=0.7,
-                max_plan_iterations=4,
+                max_plan_iterations=2,
             ),
             metadata={
                 "planner": "deterministic_fallback",
                 "plannerSource": "deterministic_fallback",
                 "selected_pillars": list(selected),
+                "asset_class": ac.value,
             },
         )
 
     def _plan_from_llm_draft(self, brief: ResearchBrief, draft: ResearchPlanDraft, fallback: ResearchPlan) -> ResearchPlan:
         """Validate an LLM plan draft and return a harness-ready plan."""
-        selected = list(brief.selected_pillars or DEFAULT_COMPANY_PILLARS)
+        # Resolve asset class for evidence requirements and core-pillar budget.
+        entity = brief.entities[0] if brief.entities else None
+        raw_ac = (entity.asset_class if entity else "") or brief.constraints.get("asset_class", "")
+        try:
+            ac = AssetClass(raw_ac) if raw_ac else AssetClass.EQUITY_STOCK
+        except ValueError:
+            ac = AssetClass.EQUITY_STOCK
+        core_pillars = get_core_pillars(ac)
+
+        selected = list(brief.selected_pillars) if brief.selected_pillars else list(get_pillars(ac))
         by_pillar: dict[str, PlannedWorkstream] = {}
         for item in draft.workstreams:
             pillar = item.pillar_name or item.title
@@ -242,11 +315,11 @@ class ResearchPlanner:
                     title=pillar,
                     pillar_name=pillar,
                     goal=item.goal.strip() or self._pillar_goal(pillar, brief),
-                    required_evidence=PILLAR_EVIDENCE_REQUIREMENTS[pillar],
-                    search_focus=_dedupe(item.search_focus + PILLAR_SEARCH_FOCUS.get(pillar, []))[:8],
+                    required_evidence=get_evidence_requirements(ac, pillar),
+                    search_focus=_dedupe(item.search_focus + get_search_focus(ac, pillar))[:8],
                     open_gaps=item.open_gaps[:6],
-                    max_iterations=3,
-                    metadata={**item.metadata, "planner": "llm", "instrumentStatus": draft.instrument_status},
+                    max_iterations=2 if pillar in core_pillars else 1,
+                    metadata={**item.metadata, "planner": "llm", "asset_class": ac.value, "instrumentStatus": draft.instrument_status},
                 )
             )
         return ResearchPlan(

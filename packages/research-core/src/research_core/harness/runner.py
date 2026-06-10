@@ -133,6 +133,17 @@ class CompanyResearchRunner:
         selected_pillars = selected_pillars or [workstream.title for workstream in plan.workstreams]
         artifact_records: list[dict[str, Any]] = []
 
+        # Resolve asset class from plan metadata (set by the planner).
+        _raw_ac = plan.metadata.get("asset_class", "")
+        if not _raw_ac and plan.entities:
+            _raw_ac = plan.entities[0].asset_class or ""
+        try:
+            from research_core.harness.asset_class import AssetClass as _AC
+            _asset_class = _AC(_raw_ac) if _raw_ac else _AC.EQUITY_STOCK
+        except (ValueError, ImportError):
+            from research_core.harness.asset_class import AssetClass as _AC
+            _asset_class = _AC.EQUITY_STOCK
+
         # ── Stage timing tracking ────────────────────────────────────────────
         run_start = time.perf_counter()
         run_started_at = _utc_iso()
@@ -330,7 +341,7 @@ class CompanyResearchRunner:
             },
         )
         _stage_start("pillar_assessment")
-        pillar_assessments = self.tools.assess_pillars(evidence_by_pillar)
+        pillar_assessments = self.tools.assess_pillars(evidence_by_pillar, asset_class=_asset_class)
         _stage_end("pillar_assessment")
         self._emit(
             progress_callback,
@@ -351,7 +362,10 @@ class CompanyResearchRunner:
             },
         )
         _stage_start("score")
-        scorecard = self.tools.build_scorecard(company_name, ticker, pillar_assessments, evidence_by_pillar)
+        scorecard = self.tools.build_scorecard(
+            company_name, ticker, pillar_assessments, evidence_by_pillar,
+            asset_class=_asset_class,
+        )
         _stage_end("score")
 
         run_completed_at = _utc_iso()
@@ -718,21 +732,52 @@ class CompanyResearchRunner:
             }
         retry_workstreams = weak[:2]
         total = max(len(retry_workstreams), 1)
-        for index, workstream in enumerate(retry_workstreams, start=1):
-            self._emit(
-                progress_callback,
-                "targeted_fallback",
-                {
-                    "status": "running",
-                    "stage_progress": round(((index - 1) / total) * 100, 1),
-                    "current_substep": f"fallback search for {workstream.title} ({index}/{len(retry_workstreams)})",
-                },
-            )
-            fallback = self.tools.run_targeted_fallback_search(company_name, ticker, workstream)
+        self._emit(
+            progress_callback,
+            "targeted_fallback",
+            {
+                "status": "running",
+                "stage_progress": 5,
+                "current_substep": f"running {total} targeted fallback search(es) in parallel",
+            },
+        )
+
+        fallback_results: dict[str, dict] = {}
+
+        def _run_fallback(workstream: Any) -> tuple[str, dict]:
+            result = self.tools.run_targeted_fallback_search(company_name, ticker, workstream)
+            return workstream.pillar_name or workstream.title, result
+
+        with ThreadPoolExecutor(max_workers=min(total, 4), thread_name_prefix="fallback") as executor:
+            futures = {executor.submit(_run_fallback, ws): ws for ws in retry_workstreams}
+            done_count = 0
+            for future in as_completed(futures):
+                ws = futures[future]
+                done_count += 1
+                try:
+                    pillar, fallback = future.result()
+                    fallback_results[pillar] = fallback
+                    ws.mark_step_completed("targeted_fallback_search")
+                except Exception as exc:
+                    logger.warning("Targeted fallback failed for %s: %s", ws.title, exc)
+                self._emit(
+                    progress_callback,
+                    "targeted_fallback",
+                    {
+                        "status": "running",
+                        "stage_progress": round((done_count / total) * 95, 1),
+                        "current_substep": f"fallback complete for {ws.title} ({done_count}/{total})",
+                    },
+                )
+
+        for workstream in retry_workstreams:
             pillar = workstream.pillar_name or workstream.title
+            if pillar not in fallback_results:
+                continue
+            fallback = fallback_results[pillar]
             evidence_by_pillar[pillar].extend(fallback.get("evidence_by_pillar", {}).get(pillar, []))
             sources_by_pillar[pillar].extend(fallback.get("sources_by_pillar", {}).get(pillar, []))
-            workstream.mark_step_completed("targeted_fallback_search")
+
         return {"used_full_fallback": False}
 
     def _build_summary(
@@ -975,6 +1020,27 @@ class ResearchAgentLoop:
             return elapsed
 
         # ── Stage 1: per-workstream grounded search with retry ──────────────
+        # Fire document discovery search queries concurrently with grounded
+        # research so the two I/O-heavy phases overlap. Results are collected
+        # after grounded research completes and forwarded to the discovery tool.
+        _doc_search_candidates: list[dict] = []
+        _doc_search_error: list[BaseException] = []
+
+        def _prefetch_doc_search() -> None:
+            try:
+                _doc_search_candidates.extend(
+                    self.tools.run_document_search_queries(company_name, ticker)
+                )
+            except Exception as exc:
+                _doc_search_error.append(exc)
+
+        _doc_prefetch_thread = threading.Thread(
+            target=_prefetch_doc_search,
+            daemon=True,
+            name=f"doc-prefetch-{ticker}",
+        )
+        _doc_prefetch_thread.start()
+
         self._emit(progress_callback, "grounded_research", {
             "status": "running", "stage_progress": 1,
             "current_substep": "starting agentic source research workstreams",
@@ -989,6 +1055,11 @@ class ResearchAgentLoop:
             "current_substep": f"completed {len(grounded_results)} workstreams",
         })
 
+        # Join the prefetch thread (should already be done by now).
+        _doc_prefetch_thread.join(timeout=30)
+        if _doc_search_error:
+            logger.warning("Document search prefetch failed: %s", _doc_search_error[0])
+
         # ── Stage 2: primary document discovery ─────────────────────────────
         self._emit(progress_callback, "primary_documents", {
             "status": "running", "stage_progress": 5,
@@ -999,6 +1070,7 @@ class ResearchAgentLoop:
             self._make_ctx(brief, ticker=ticker, company_name=company_name,
                            grounded_results=grounded_results),
             grounded_results=grounded_results,
+            pre_fetched_candidates=_doc_search_candidates if _doc_search_candidates else None,
         )
         documents: list = doc_result.output or []
         self._emit(progress_callback, "primary_documents", {
@@ -1137,7 +1209,7 @@ class ResearchAgentLoop:
             try:
                 gen = FinalSynthesisGenerator()
                 uri = gen.persist_artifact(ticker, synth_result.output)
-                self._record_artifact(
+                self._record_artifact_to(
                     artifact_records,
                     artifact_type="final_synthesis",
                     storage_uri=uri,
