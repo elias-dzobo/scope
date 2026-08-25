@@ -17,11 +17,8 @@ primary_region = "iad"
   SCOPE_REQUIRE_AUTH = "true"
   SCOPE_AUTO_MIGRATE = "false"
   SCOPE_DB_BACKEND = "postgres"
-  RESEARCH_EXECUTION_BACKEND = "durable"
-  RESEARCH_MAX_WORKERS = "0"
   RESEARCH_LEASE_SECONDS = "300"
   RESEARCH_HEARTBEAT_SECONDS = "30"
-  RESEARCH_WORKER_POLL_SECONDS = "2"
   ARTIFACT_STORE_BACKEND = "s3"
   ARTIFACT_BUCKET = "scope-artifacts"
   ARTIFACT_S3_ENDPOINT_URL = "https://fly.storage.tigris.dev"
@@ -58,12 +55,12 @@ primary_region = "iad"
 [[vm]]
   processes = ["web"]
   size = "shared-cpu-1x"
-  memory = "1gb"
+  memory = "512mb"
 
 [[vm]]
   processes = ["worker"]
-  size = "shared-cpu-2x"
-  memory = "2gb"
+  size = "shared-cpu-1x"
+  memory = "1gb"
 
 [[restart]]
   processes = ["worker"]

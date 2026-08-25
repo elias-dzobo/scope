@@ -64,7 +64,8 @@ Design reference:
 - Request correlation IDs and rate limiting middleware
 - Deterministic + LLM hybrid pipeline
 - API key auth optional via `RESEARCH_API_KEY`
-- In-process orchestration with bounded queue and retries
+- Durable DB-backed job queue with leases, heartbeats, and retry budget
+- Event-driven worker wake-up via Postgres `LISTEN`/`NOTIFY` (no idle polling)
 - Prometheus metrics and OpenTelemetry traces
 - Grafana dashboard for production observability
 
@@ -92,10 +93,11 @@ Design reference:
 - `RESEARCH_RATE_LIMIT_BURST`
 - `RESEARCH_API_MAX_LIMIT`
 - `SEARCH_PROVIDER=auto|exa|tavily|google|ddg`
-- `RESEARCH_MAX_WORKERS`
-- `RESEARCH_QUEUE_DEPTH`
 - `RESEARCH_MAX_RETRIES`
-- `RESEARCH_RETRY_BASE_SECONDS`
+- `RESEARCH_LEASE_SECONDS` (worker lease duration, default 300)
+- `RESEARCH_HEARTBEAT_SECONDS` (lease renewal interval, default 30)
+- `RESEARCH_WORKER_POLL_SECONDS` (SQLite fallback only; Postgres uses LISTEN/NOTIFY)
+- `SCOPE_ALLOWED_ORIGINS` (comma-separated CORS origins; required for a non-default UI port)
 - `CLOUDFLARE_ACCOUNT_ID` or `CF_ACCOUNT_ID`
 - `CLOUDFLARE_BROWSER_RENDERING_API_TOKEN` or `CF_BROWSER_RENDERING_API_TOKEN`
 - `CLOUDFLARE_MARKDOWN_CACHE_TTL`
@@ -129,34 +131,43 @@ Use `.env` to keep local defaults and values.
 
 ### 1) Install backend dependencies
 
-From project root:
+From project root — install third-party deps, then the four internal packages
+as editable installs so their `src/` trees are importable:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install .
+uv sync
+uv pip install --no-deps -e packages/agent-core -e packages/research-core -e packages/provider-integrations -e apps/api
 ```
 
-Or using uv:
+Verify:
 
 ```bash
-uv pip install -r pyproject.toml
+uv run python -c "import scope_api, research_core, agent_core, provider_integrations; print('ok')"
 ```
 
 ### 2) Start backend API
 
 ```bash
-python api_main.py
+uv run python api_main.py
 ```
 
-`api_main.py` runs:
+`api_main.py` runs database initialization, API middleware, and observability
+wiring. **It does not execute research** — that is the worker's job.
 
-- database initialization (`scope_api.db`)
-- startup orchestration workers
-- API middleware and observability wiring
+### 3) Start the research worker
 
-### 3) Start web app
+Research runs are executed by a separate worker process. Without it, submitted
+runs stay `queued` forever:
+
+```bash
+uv run python -m scope_api.worker
+```
+
+The worker leases queued runs under a heartbeat-renewed lease. On Postgres it
+waits on `LISTEN new_research_run` and wakes instantly; on local SQLite it falls
+back to polling every `RESEARCH_WORKER_POLL_SECONDS`.
+
+### 4) Start web app
 
 ```bash
 cd apps/web
@@ -166,8 +177,12 @@ npm run dev
 
 Frontend defaults:
 
-- UI: `http://localhost:3000`
+- UI: `http://localhost:3000` (vite config port)
 - API base: `http://localhost:8000` via `VITE_API_BASE_URL`
+
+If you run the UI on a non-default port, add that origin to
+`SCOPE_ALLOWED_ORIGINS` — the API sets `allow_credentials=True`, and browsers
+reject a wildcard CORS origin on credentialed requests.
 
 ### 4) (Optional) Start full observability stack
 
@@ -275,10 +290,15 @@ Both layers return run status/progress and result payloads required by the UI.
 
 ## Troubleshooting
 
-- If web creates runs but never progresses:
-  - verify backend health at `http://localhost:8000/health`
+- If web creates runs but they stay `queued`:
+  - confirm the worker process is running (`uv run python -m scope_api.worker`) —
+    this is the most common cause, since the API never executes research itself
+  - verify backend health at `http://localhost:8000/health`; the `orchestrator`
+    field reports current `queued` / `running` counts
   - check `RESEARCH_*` limits are not rejecting submissions
-  - inspect API logs for orchestration errors
+- If the UI loads but stays on "Loading your workspace…":
+  - check the browser console for a CORS error and add the UI origin to
+    `SCOPE_ALLOWED_ORIGINS`
 - If dashboards stay empty:
   - confirm API exposes `/metrics`
   - confirm `OBSERVABILITY_*` flags are enabled

@@ -13,7 +13,6 @@ from typing import Any
 
 from scope_api import db
 from scope_api.memory import index_completed_research_run
-from scope_api.orchestration import OrchestrationManager, OrchestratorConfig
 from research_core.harness.controller import ResearchController
 from scope_api.observability.metrics import (
     observe_pipeline_stage,
@@ -81,7 +80,7 @@ STAGE_START_PROGRESS = {stage: (idx / len(STAGE_ORDER)) * 100 for idx, stage in 
 
 
 class ResearchRunRejectedError(RuntimeError):
-    """Raised when run submission cannot be accepted by the orchestrator."""
+    """Raised when run submission cannot be accepted."""
 
 
 class ResearchLimitExceededError(RuntimeError):
@@ -103,46 +102,8 @@ class RunArtifacts:
     profile_snapshot: dict[str, Any] | None = None
 
 
-@dataclass(frozen=True)
-class OrchestratorConfigInput:
-    """Container for orchestrator config extracted from environment."""
-
-    max_workers: int
-    max_queue_depth: int
-    max_retries: int
-    retry_base_seconds: float
-    worker_name_prefix: str = "scope-worker"
-
-    @classmethod
-    def from_env(cls) -> "OrchestratorConfigInput":
-        """Read orchestrator tuning values from environment."""
-
-        return cls(
-            max_workers=_to_int(os.getenv("RESEARCH_MAX_WORKERS", "2"), 2),
-            max_queue_depth=_to_int(os.getenv("RESEARCH_QUEUE_DEPTH", "200"), 200),
-            max_retries=_to_int(os.getenv("RESEARCH_MAX_RETRIES", "1"), 1),
-            retry_base_seconds=_to_float(os.getenv("RESEARCH_RETRY_BASE_SECONDS", "2") or "2", 2.0),
-            worker_name_prefix="scope-worker",
-        )
-
-    def to_orchestrator_config(self) -> OrchestratorConfig:
-        """Convert to the infra-layer config object."""
-        return OrchestratorConfig(
-            max_workers=self.max_workers,
-            max_queue_depth=self.max_queue_depth,
-            max_retries=self.max_retries,
-            retry_base_seconds=self.retry_base_seconds,
-            worker_name_prefix=self.worker_name_prefix,
-        )
-
-
-def execution_backend() -> str:
-    """Return the configured research execution backend.
-
-    ``in_process`` preserves local compatibility. ``durable`` stores queued
-    jobs in the database for a separate worker process to lease and execute.
-    """
-    return os.getenv("RESEARCH_EXECUTION_BACKEND", "in_process").strip().lower() or "in_process"
+def _max_retries() -> int:
+    return _to_int(os.getenv("RESEARCH_MAX_RETRIES", "1"), 1)
 
 
 def _to_int(value: str, default: int) -> int:
@@ -236,21 +197,14 @@ class ResearchRunService:
     - pipeline invocation is centralized and instrumented with progress callbacks
     """
 
-    def __init__(self, orchestrator: OrchestrationManager | None = None) -> None:
-        self._orchestrator = orchestrator or OrchestrationManager(
-            runner=self._run_pipeline_job,
-            on_job_failed=self._on_job_failed,
-            config=OrchestratorConfigInput.from_env().to_orchestrator_config(),
-        )
+    def __init__(self) -> None:
         self._research_controller = ResearchController()
 
     def start(self) -> None:
-        """Start background worker pool."""
-        self._orchestrator.start()
+        """No-op — lifecycle managed by the durable worker process."""
 
     def stop(self) -> None:
-        """Stop background worker pool."""
-        self._orchestrator.shutdown()
+        """No-op — lifecycle managed by the durable worker process."""
 
     def submit_run(
         self,
@@ -275,39 +229,14 @@ class ResearchRunService:
             user_id=user_id,
         )
 
-        if execution_backend() == "durable":
-            db.append_event(
-                run_id,
-                "queued",
-                "queued",
-                {
-                    "current_substep": "waiting for research worker",
-                    "executionBackend": "durable",
-                },
-            )
-            record_orchestrator_submission("accepted_durable")
-            return run_id
-
-        accepted = self._orchestrator.submit(
-            run_id=run_id,
-            company_name=company_name,
-            ticker=ticker,
-            selected_pillars=normalized_pillars,
+        db.append_event(
+            run_id,
+            "queued",
+            "queued",
+            {"current_substep": "waiting for research worker"},
         )
-
-        if not accepted:
-            record_orchestrator_submission("rejected_queue_full")
-            db.update_run_state(
-                run_id,
-                status="failed",
-                current_stage="rejected",
-                progress=0,
-                error_message="Submission rejected: orchestration queue is full",
-                completed=True,
-            )
-            raise ResearchRunRejectedError("Orchestration queue is full")
-
-        record_orchestrator_submission("accepted")
+        db.notify_run_queued(run_id)
+        record_orchestrator_submission("accepted_durable")
         return run_id
 
     def _enforce_research_limits(self, user_id: str | None) -> None:
@@ -367,20 +296,8 @@ class ResearchRunService:
         return _artifact_to_dto(row["result"])
 
     def get_run_health(self) -> dict[str, int]:
-        """Expose orchestration metrics to API and operations."""
-        return self._orchestrator.get_health()
-
-    def _on_job_failed(self, run_id: str, exc: BaseException, attempt: int) -> None:
-        """Persist terminal failure and mark status in DB."""
-        record_orchestrator_completion("failed")
-        db.update_run_state(
-            run_id,
-            status="failed",
-            current_stage="failed",
-            progress=100,
-            error_message=f"{str(exc)} | attempts={attempt + 1}",
-            completed=True,
-        )
+        """Expose current queue depth for health endpoints and monitoring."""
+        return db.count_runs_by_status()
 
     def _create_run_record(
         self,
@@ -399,7 +316,7 @@ class ResearchRunService:
             ticker=ticker,
             selected_pillars=selected_pillars,
             user_id=user_id,
-            max_retries=OrchestratorConfigInput.from_env().max_retries,
+            max_retries=_max_retries(),
             budget_snapshot=self._build_budget_snapshot(user_id=user_id, selected_pillars=selected_pillars),
         )
         return run_id
@@ -418,13 +335,13 @@ class ResearchRunService:
             "providerCallBudget": _to_int(os.getenv("RESEARCH_PROVIDER_CALL_BUDGET", "80"), 80),
             "tokenBudget": _to_int(os.getenv("RESEARCH_TOKEN_BUDGET", "150000"), 150000),
             "documentBudget": _to_int(os.getenv("RESEARCH_DOCUMENT_BUDGET", "25"), 25),
-            "retryBudget": OrchestratorConfigInput.from_env().max_retries,
+            "retryBudget": _max_retries(),
             "userId": user_id or "",
             "capturedAt": db.utc_now_iso(),
         }
 
-    def _run_pipeline_job(self, run_id: str, company_name: str, ticker: str, selected_pillars: list[str]) -> None:
-        """Synchronous pipeline execution function for one queue job."""
+    def execute_run(self, run_id: str, company_name: str, ticker: str, selected_pillars: list[str]) -> None:
+        """Synchronous pipeline execution — called by the durable worker after leasing a run."""
         with observe_span(
             "service.run_pipeline_job",
             {"run_id": run_id, "ticker": ticker, "company_name": company_name},

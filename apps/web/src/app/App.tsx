@@ -13,7 +13,7 @@ import { ViewMode, ResearchRunData, RunStatus, StartResearchPayload, RunListItem
 import { useAuthedFetch } from '../auth/useAuthedFetch';
 import { useAuth } from '../auth/AuthProvider';
 import { fetchOnboardingProfile } from '../auth/onboardingApi';
-import { API_BASE } from '../auth/config';
+import { API_BASE, DEV_AUTH_BYPASS } from '../auth/config';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -46,6 +46,17 @@ const App: React.FC = () => {
     // fetchOnboardingProfile sends credentials: 'include', so the cookie
     // authenticates the request even without a Bearer token in the header.
 
+    // Bypass mode has no session, so the profile endpoint would only 401.
+    // Land on HOME with the "complete your profile" nudge and load the runs.
+    if (DEV_AUTH_BYPASS) {
+      setProfile(null);
+      setCurrentView((current) =>
+        current === ViewMode.LANDING ? ViewMode.HOME : current,
+      );
+      void loadRuns();
+      return;
+    }
+
     setProfileLoading(true);
     fetchOnboardingProfile(token)
       .then((loaded) => {
@@ -62,6 +73,8 @@ const App: React.FC = () => {
         setCurrentView((current) =>
           current === ViewMode.LANDING ? ViewMode.HOME : current,
         );
+        // A failed profile lookup should not also hide the run history.
+        void loadRuns();
       })
       .finally(() => setProfileLoading(false));
   }, [authLoading, user?.id]);

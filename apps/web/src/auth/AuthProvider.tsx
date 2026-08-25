@@ -5,7 +5,7 @@ import {
   logoutSession,
 } from './authApi';
 import { AuthUser } from '../types/api';
-import { GOOGLE_CLIENT_ID } from './config';
+import { DEV_AUTH_BYPASS, DEV_BYPASS_USER, GOOGLE_CLIENT_ID } from './config';
 
 declare global {
   interface Window {
@@ -45,6 +45,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState('');
 
   useEffect(() => {
+    // Local bypass: skip the session lookup and boot straight into the workspace.
+    if (DEV_AUTH_BYPASS) {
+      setUser(DEV_BYPASS_USER);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     fetchCurrentUser(token)
       .then(setUser)
@@ -59,6 +65,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [token]);
 
   useEffect(() => {
+    // No Google script needed when the sign-in step is bypassed.
+    if (DEV_AUTH_BYPASS) return;
     if (!GOOGLE_CLIENT_ID) {
       setAuthError('Google sign-in is not configured. Set VITE_GOOGLE_CLIENT_ID and restart the frontend.');
       setGoogleReady(false);
@@ -78,6 +86,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signOut = async () => {
+    // In bypass mode there is no session to revoke, and dropping the user would
+    // strand the app on the sign-in page it is meant to skip.
+    if (DEV_AUTH_BYPASS) {
+      setUser(DEV_BYPASS_USER);
+      return;
+    }
     await logoutSession(token);
     setToken('');
     setUser(null);

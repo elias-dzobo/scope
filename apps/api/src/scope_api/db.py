@@ -3034,6 +3034,32 @@ def count_active_user_runs(user_id: str) -> int:
     return int(row["count"] if row else 0)
 
 
+def count_runs_by_status() -> dict[str, int]:
+    """Return queued/running counts across all runs for health and queue-depth reporting."""
+    if database_backend() == "postgres":
+        conn = _connect_postgres()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT status, COUNT(*) AS count FROM research_runs "
+                    "WHERE status IN ('queued', 'running') GROUP BY status"
+                )
+                rows = cur.fetchall()
+        finally:
+            conn.close()
+    else:
+        conn = _connect()
+        try:
+            rows = conn.execute(
+                "SELECT status, COUNT(*) AS count FROM research_runs "
+                "WHERE status IN ('queued', 'running') GROUP BY status"
+            ).fetchall()
+        finally:
+            conn.close()
+    counts = {str(row["status"]): int(row["count"]) for row in rows}
+    return {"queued": counts.get("queued", 0), "running": counts.get("running", 0)}
+
+
 def lease_next_research_run(worker_id: str, lease_seconds: int = 300) -> dict[str, Any] | None:
     """Atomically lease the next queued or stale running research run.
 
@@ -3285,3 +3311,19 @@ def _list_runs_postgres(
     finally:
         conn.close()
     return [_row_to_run(row) for row in rows]
+
+
+def notify_run_queued(run_id: str) -> None:
+    """Fire a Postgres NOTIFY so durable workers wake immediately instead of waiting for the next poll.
+
+    No-op on SQLite (local dev uses polling fallback).
+    """
+    if database_backend() != "postgres":
+        return
+    conn = _connect_postgres()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_notify('new_research_run', %s)", (run_id,))
+        conn.commit()
+    finally:
+        conn.close()
